@@ -8,6 +8,8 @@ from fastapi.staticfiles import StaticFiles
 
 from net_grading.config import get_settings
 from net_grading.db.engine import dispose_engine
+from net_grading.routes import auth as auth_routes
+from net_grading.routes import grading as grading_routes
 
 _STATIC_DIR = Path(__file__).parent / "static"
 
@@ -29,6 +31,9 @@ def create_app() -> FastAPI:
 
     if _STATIC_DIR.exists():
         app.mount("/static", StaticFiles(directory=_STATIC_DIR), name="static")
+
+    app.include_router(auth_routes.router)
+    app.include_router(grading_routes.router)
 
     @app.get("/health")
     async def health() -> JSONResponse:

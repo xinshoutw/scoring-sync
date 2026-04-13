@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="zh-Hant" class="{{ theme | default('dark') }}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}net-grading{% endblock %}</title>
+    <script>
+        // 防 FOUC：立即套用主題
+        (function () {
+            var t = localStorage.getItem('theme') || 'dark';
+            document.documentElement.className = t;
+        })();
+    </script>
+    <link rel="stylesheet" href="{{ url_for('static', path='css/app.css') }}">
+    <style>
+        /* M2 placeholder style — Tailwind/design tokens 在 M7 完整建置 */
+        :root { color-scheme: light dark; --fg: #e8e8e8; --bg: #141414; --muted: #888; --accent: #8a9dff; --border: #2a2a2a; }
+        html.light { --fg: #1a1a1a; --bg: #fafafa; --muted: #666; --accent: #3a4ecb; --border: #e0e0e0; }
+        body { background: var(--bg); color: var(--fg); font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; margin: 0; min-height: 100vh; }
+        header.top { display: flex; justify-content: space-between; align-items: center; padding: 16px 32px; border-bottom: 1px solid var(--border); }
+        header.top .brand { font-weight: 600; letter-spacing: 0.02em; }
+        header.top nav { display: flex; gap: 12px; align-items: center; }
+        header.top button, header.top a { background: transparent; border: 1px solid var(--border); color: var(--fg); padding: 6px 12px; border-radius: 6px; cursor: pointer; font: inherit; text-decoration: none; }
+        header.top button:hover, header.top a:hover { border-color: var(--accent); }
+        main { max-width: 960px; margin: 0 auto; padding: 32px; }
+        h1 { font-weight: 600; letter-spacing: -0.01em; }
+        .muted { color: var(--muted); }
+        .error { color: #ff6464; padding: 8px 12px; border: 1px solid #5a2020; border-radius: 6px; background: rgba(255,50,50,0.05); }
+        input[type="text"], input[type="password"], input[type="email"] { background: transparent; border: 1px solid var(--border); color: var(--fg); padding: 10px 12px; border-radius: 6px; font: inherit; width: 100%; box-sizing: border-box; }
+        input:focus { outline: none; border-color: var(--accent); }
+        button.primary { background: var(--accent); color: #fff; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font: inherit; font-weight: 500; }
+        button.primary:hover { filter: brightness(1.1); }
+    </style>
+</head>
+<body>
+    {% if user %}
+    <header class="top">
+        <div class="brand">net-grading</div>
+        <nav>
+            <span class="muted">{{ user.user_id }} · {{ user.name }}</span>
+            <button type="button" onclick="toggleTheme()">主題</button>
+            <form method="post" action="/logout" style="margin:0">
+                <button type="submit">登出</button>
+            </form>
+        </nav>
+    </header>
+    {% endif %}
+    <main>
+        {% block content %}{% endblock %}
+    </main>
+    <script>
+        function toggleTheme() {
+            var cur = document.documentElement.className;
+            var next = cur === 'dark' ? 'light' : 'dark';
+            document.documentElement.className = next;
+            localStorage.setItem('theme', next);
+        }
+    </script>
+</body>
+</html>

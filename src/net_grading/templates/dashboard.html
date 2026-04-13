@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}Dashboard · net-grading{% endblock %}
+{% block content %}
+<h1>Hi, {{ user.name }}</h1>
+<p class="muted">{{ user.user_id }} · {{ user.class_name }}</p>
+<p style="margin-top: 32px;">
+    Session 到期時間：{{ user.expires_at.strftime('%Y-%m-%d %H:%M') }} UTC
+</p>
+<p class="muted" style="margin-top: 16px;">
+    Dashboard 的完整功能（目標列表 / 同步狀態 / 衝突提示）將在 M3–M7 逐步實作。
+</p>
+{% endblock %}

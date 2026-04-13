@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}登入 · net-grading{% endblock %}
+{% block content %}
+<h1>學生互評同步閘道</h1>
+<p class="muted">輸入學號登入。本站會透明同步你的評分到 Site1 / Site2 / Site3。</p>
+
+<form method="post" action="/login" style="margin-top: 24px; max-width: 360px;">
+    <label for="student_id" style="display: block; margin-bottom: 8px;">學號</label>
+    <input type="text" name="student_id" id="student_id" required autofocus
+           autocomplete="username" placeholder="例如：B11315009"
+           value="{{ student_id | default('') }}">
+    {% if error %}
+    <p class="error" style="margin-top: 12px;">{{ error }}</p>
+    {% endif %}
+    <button type="submit" class="primary" style="margin-top: 16px;">登入</button>
+</form>
+{% endblock %}
