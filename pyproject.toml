@@ -1,0 +1,7 @@
+[project]
+name = "net-grading"
+version = "0.1.0"
+requires-python = ">=3.14"
+dependencies = [
+    "httpx[http2]>=0.28.1",
+]
