@@ -1,3 +1,10 @@
+# Project-specific
+*.db
+*.db-journal
+*.db-shm
+*.db-wal
+src/net_grading/static/css/app.css
+
 # Created by https://www.toptal.com/developers/gitignore/api/python,intellij,macos,linux,windows,visualstudio,visualstudiocode,pycharm
 # Edit at https://www.toptal.com/developers/gitignore?templates=python,intellij,macos,linux,windows,visualstudio,visualstudiocode,pycharm
 
