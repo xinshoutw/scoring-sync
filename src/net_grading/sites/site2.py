@@ -33,7 +33,7 @@ from net_grading.sites.errors import (
 IDENTITY_BASE = "https://identitytoolkit.googleapis.com"
 SECURETOKEN_BASE = "https://securetoken.googleapis.com"
 FIRESTORE_BASE = "https://firestore.googleapis.com"
-USER_AGENT = "net-grading/0.1 (+https://github.com/xinshoutw/net-grading)"
+USER_AGENT = "xinshoutw-scoring-sync/0.1 (+https://github.com/xinshoutw/scoring-sync)"
 
 
 @dataclass(frozen=True)

@@ -27,7 +27,7 @@ from net_grading.sites.errors import (
 )
 
 
-USER_AGENT = "net-grading/0.1 (+https://github.com/xinshoutw/net-grading)"
+USER_AGENT = "xinshoutw-scoring-sync/0.1 (+https://github.com/xinshoutw/scoring-sync)"
 SID_TTL = timedelta(hours=24)
 
 

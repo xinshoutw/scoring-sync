@@ -1,4 +1,4 @@
-# net-grading
+# scoring-sync
 
 學生互評同步閘道：一次評分，自動分發到 Site1 (ita-grading) / Site2 (ntust-grading, Firebase) / Site3 (Google Apps Script)。
 

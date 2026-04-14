@@ -38,7 +38,7 @@ def _prefers_html(request: Request) -> bool:
 def create_app() -> FastAPI:
     settings = get_settings()
     app = FastAPI(
-        title="net-grading",
+        title="scoring-sync",
         version="0.1.0",
         debug=settings.app_env != "production",
         lifespan=lifespan,
