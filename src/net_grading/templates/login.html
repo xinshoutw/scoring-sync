@@ -19,15 +19,14 @@
         <span class="logo-text">評分系統</span>
     </div>
     <h1 style="font-size: 32px; line-height: 1.15;">
-        一次評分，<br>
-        <span class="accent-gradient-text">同步三站。</span>
+        一次評分<br>
+        <span class="accent-gradient-text">同步三站</span>
     </h1>
-    <p class="muted" style="margin-top: 10px;">輸入學號登入，免重複填寫。</p>
 
     <form method="post" action="/login" class="card" style="margin-top: 28px; padding: 28px;">
         <label for="student_id">學號</label>
         <input type="text" name="student_id" id="student_id" required autofocus
-               autocomplete="username" placeholder="例如：B11315009"
+               autocomplete="username" placeholder="B11315009"
                value="{{ student_id | default('') }}">
         {% if error %}
         <p class="error" style="margin-top: 16px;">{{ error }}</p>
