@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Dashboard · 評分系統{% endblock %}
 {% block content %}
-<div class="row-between" style="align-items: flex-end; margin-bottom: 12px;">
+<div class="row-between dash-header" style="align-items: flex-end; margin-bottom: 12px;">
     <div>
         <h1>{{ period_label or '期中報告' }}</h1>
         <p class="muted">{{ user.user_id }} · {{ user.name }}</p>
@@ -36,7 +36,7 @@
 </p>
 {% endif %}
 
-<div style="display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 24px; margin-top: 20px; align-items: start;">
+<div class="dashboard-grid">
 
     <!-- 主：分組學生列表 -->
     <section class="card" style="padding: 0;">
@@ -59,7 +59,7 @@
                 <tr>
                     <th style="padding-left: 22px;">學號</th>
                     <th>姓名</th>
-                    <th>班級</th>
+                    <th class="hide-sm">班級</th>
                     <th style="text-align: right;">分數</th>
                     <th style="padding-right: 22px;"></th>
                 </tr>
@@ -69,7 +69,7 @@
                 <tr class="{% if t.student_id in skipped_targets %}is-skipped{% endif %}">
                     <td class="mono" style="padding-left: 22px;">{{ t.student_id }}</td>
                     <td>{{ t.name }}</td>
-                    <td class="muted">{{ t.class_name }}</td>
+                    <td class="muted hide-sm">{{ t.class_name }}</td>
                     <td class="mono" style="text-align: right;">
                         {% if t.local_total is not none %}
                             <strong>{{ t.local_total }}</strong><span class="subtle">/100</span>

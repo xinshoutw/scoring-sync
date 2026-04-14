@@ -85,6 +85,7 @@
             display: flex;
             align-items: center;
             justify-content: space-between;
+            gap: 12px;
             padding: 14px 28px;
             background: var(--surface);
             border-bottom: 1px solid var(--border);
@@ -103,8 +104,16 @@
             gap: 8px;
             align-items: center;
             font-size: 13px;
+            flex-shrink: 0;
         }
-        header.top .user-info { color: var(--fg-muted); margin-right: 8px; }
+        header.top .user-info {
+            color: var(--fg-muted);
+            margin-right: 8px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 240px;
+        }
 
         /* ── Layout ───────────────────────────────────────── */
         main {
@@ -360,6 +369,52 @@
         .row { display: flex; align-items: center; gap: 12px; }
         .row-between { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
         .stack { display: flex; flex-direction: column; gap: 16px; }
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) 320px;
+            gap: 24px;
+            margin-top: 20px;
+            align-items: start;
+        }
+
+        /* ── Mobile (< 860px) ─────────────────────────────── */
+        @media (max-width: 860px) {
+            header.top { padding: 12px 16px; gap: 8px; }
+            header.top .brand-text,
+            header.top .user-info { display: none; }
+            header.top nav { font-size: 12px; gap: 6px; }
+            header.top nav .btn { padding: 6px 10px; font-size: 12px; }
+
+            main { padding: 24px 16px 60px; }
+            h1 { font-size: 24px; }
+            h2 { font-size: 16px; }
+
+            /* Dashboard 標題列改直列 */
+            .row-between.dash-header {
+                flex-direction: column;
+                align-items: stretch;
+                gap: 12px;
+            }
+            .tabs { align-self: flex-start; }
+            .tabs a { padding: 6px 12px; font-size: 13px; }
+
+            /* Dashboard 單欄 */
+            .dashboard-grid { grid-template-columns: 1fr; gap: 16px; }
+
+            /* 表格精簡：非關鍵欄位躲 mobile */
+            table th.hide-sm,
+            table td.hide-sm { display: none; }
+            th, td { padding: 10px 6px; }
+
+            /* Grid-2 在手機上改單欄（衝突頁 site1/site2 並排 → 改堆疊） */
+            .grid-2 { grid-template-columns: 1fr; gap: 12px; }
+
+            /* Period tab 被鎖字串長 → 收斂 */
+            .tabs a { white-space: nowrap; }
+
+            /* card 內邊距收斂 */
+            .card, .card-hi { padding: 16px; }
+        }
     </style>
 </head>
 <body>
@@ -382,7 +437,7 @@
                     </defs>
                 </svg>
             </span>
-            <span class="logo-text">評分系統</span>
+            <span class="logo-text brand-text">評分系統</span>
         </a>
         <nav>
             <span class="user-info">{{ user.user_id }} · {{ user.name }}</span>
