@@ -140,6 +140,18 @@ async def pending_conflicts_count(
     return len(list((await db.execute(stmt)).scalars().all()))
 
 
+async def list_skipped_targets(
+    db: AsyncSession, user_id: str, period: Period
+) -> set[str]:
+    """使用者 skip 過的衝突 target_student_id 集合（dashboard 加標籤用）."""
+    stmt = select(ConflictEvent.target_student_id).where(
+        ConflictEvent.user_id == user_id,
+        ConflictEvent.period == period,
+        ConflictEvent.resolution == "skip",
+    )
+    return {r for r in (await db.execute(stmt)).scalars().all()}
+
+
 async def list_pending_conflicts(
     db: AsyncSession, user_id: str
 ) -> list[ConflictEvent]:

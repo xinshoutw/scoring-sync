@@ -4,13 +4,13 @@
 <div style="max-width: 520px; margin: 40px auto 0;">
     <h1>歡迎，{{ user.name }}</h1>
     <p class="muted" style="margin-top: 6px;">
-        在進入評分前，可選擇先連線 <strong>{{ site_labels.site2 }}</strong>。
-        這樣系統能從兩站拉取你已填過的資料並比對，讓既有紀錄不會遺失。
+        在進入評分前，可選擇先登入 <strong>{{ site_labels.site2 }}</strong>
+        系統能夠檢查您已填過的資料並比對，讓既有紀錄不用再重新填寫！
     </p>
 
     <section class="card-hi" style="margin-top: 24px;">
         <h2 style="margin-bottom: 6px;">{{ site_labels.site2 }}</h2>
-        <p class="subtle" style="font-size: 12px; margin: 0 0 16px;">Firebase 帳號</p>
+        <p class="subtle" style="font-size: 12px; margin: 0 0 16px;">學號</p>
 
         {% if site2_error %}
         <p class="error" style="margin-bottom: 12px; font-size: 13px;">{{ site2_error }}</p>

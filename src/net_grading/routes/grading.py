@@ -27,7 +27,11 @@ from net_grading.sync.orchestrator import (
     run_sync_background,
     sync_one_submission,
 )
-from net_grading.sync.pull import initial_import, pending_conflicts_count
+from net_grading.sync.pull import (
+    initial_import,
+    list_skipped_targets,
+    pending_conflicts_count,
+)
 from sqlalchemy import select
 import asyncio
 import json
@@ -123,6 +127,7 @@ async def dashboard(
     evaluated_count = sum(1 for t in targets if t.local_total is not None)
     period_label = next((p.label for p in periods if p.code == period), period)
     site2_status = await load_site2_status(db, user.user_id)
+    skipped_targets = await list_skipped_targets(db, user.user_id, period)
 
     # 依 .env STUDENT_GROUPS 重排目標
     cfg = get_settings()
@@ -143,6 +148,7 @@ async def dashboard(
             "import_summary": import_summary,
             "site2": site2_status,
             "site2_error": site2_error,
+            "skipped_targets": skipped_targets,
             "site_labels": {
                 "site1": cfg.site1_label,
                 "site2": cfg.site2_label,

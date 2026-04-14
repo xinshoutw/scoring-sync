@@ -29,6 +29,13 @@
     {% endif %}
 {% endif %}
 
+{% if skipped_targets %}
+<p style="margin-top: 16px; padding: 10px 14px; border: 1px solid var(--warning); background: rgba(251,191,36,0.08); color: var(--warning); border-radius: 8px; font-size: 14px;">
+    ⚠ 你跳過了 <strong>{{ skipped_targets | length }}</strong> 筆兩站不一致的紀錄。
+    列表中有 <span class="tag-warn">⚠ 不一致</span> 標籤的同學代表 Site1 / Site2 資料尚未對齊；重新評分送出會覆蓋兩站。
+</p>
+{% endif %}
+
 <div style="display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 24px; margin-top: 20px; align-items: start;">
 
     <!-- 主：分組學生列表 -->
@@ -61,7 +68,7 @@
             {% for t in group_targets %}
                 <tr class="{% if t.is_self %}is-self{% endif %}">
                     <td class="mono" style="padding-left: 22px;">{{ t.student_id }}</td>
-                    <td>{{ t.name }}</td>
+                    <td>{{ t.name }}{% if t.student_id in skipped_targets %}<span class="tag-warn">⚠ 不一致</span>{% endif %}</td>
                     <td class="muted">{{ t.class_name }}</td>
                     <td class="mono" style="text-align: right;">
                         {% if t.local_total is not none %}
