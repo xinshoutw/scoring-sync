@@ -14,8 +14,54 @@
 </p>
 
 {% if error %}<p class="error" style="margin-top: 16px;">{{ error }}</p>{% endif %}
-{% if saved_id %}<p style="margin-top: 16px; padding: 10px 14px; border: 1px solid var(--accent); border-radius: 6px;">
-    已本地儲存（submission id = {{ saved_id }}）。M5 會接上三站同步。
+
+{% if sync_submission_id %}
+{% set color_map = {'success': '#4caf50', 'failed': '#e53935', 'pending': '#fb8c00', 'skipped': '#888'} %}
+{% set label_map = {'success': '✓', 'failed': '✗', 'pending': '⏳', 'skipped': '—'} %}
+<section style="margin-top: 20px; padding: 12px 16px; border: 1px solid var(--border); border-radius: 8px;">
+    <strong style="font-size: 14px;">同步狀態</strong>
+    <span class="muted" style="font-size: 13px; margin-left: 8px;">submission #{{ sync_submission_id }}</span>
+    <div style="margin-top: 12px; display: flex; gap: 16px; flex-wrap: wrap;">
+        {% for site in ['site1', 'site2', 'site3'] %}
+            {% set log = sync_status.get(site) %}
+            {% set status = log.status if log else 'pending' %}
+            {% set color = color_map.get(status, '#888') %}
+            <div style="display: flex; align-items: center; gap: 8px; padding: 6px 12px;
+                        border: 1px solid {{ color }}; border-radius: 999px;">
+                <span style="color: {{ color }}; font-weight: 600; font-family: ui-monospace, monospace;">
+                    {{ label_map.get(status, '?') }}
+                </span>
+                <span>{{ site | capitalize }}</span>
+                {% if log %}
+                <span class="muted" style="font-family: ui-monospace, monospace; font-size: 12px;">
+                    {{ log.duration_ms }}ms
+                </span>
+                {% if log.external_id %}
+                <span class="muted" style="font-size: 12px;">→ {{ log.external_id[:24] }}{% if log.external_id|length > 24 %}…{% endif %}</span>
+                {% endif %}
+                {% if status == 'failed' %}
+                <form method="post" action="/sync/{{ sync_submission_id }}/retry/{{ site }}" style="margin: 0;">
+                    <button type="submit" style="background: transparent; border: 1px solid {{ color }};
+                            color: {{ color }}; font: inherit; padding: 2px 10px; border-radius: 6px;
+                            cursor: pointer;">重試</button>
+                </form>
+                {% endif %}
+                {% endif %}
+            </div>
+        {% endfor %}
+    </div>
+    {% for site, log in sync_status.items() %}
+        {% if log.error_message %}
+        <p class="muted" style="margin-top: 8px; font-size: 12px; font-family: ui-monospace, monospace;">
+            {{ site }}: {{ log.error_message[:200] }}
+        </p>
+        {% endif %}
+    {% endfor %}
+</section>
+{% endif %}
+
+{% if saved_id %}<p style="margin-top: 12px; color: var(--muted); font-size: 13px;">
+    ✓ 本地儲存完成（submission id = {{ saved_id }}）
 </p>{% endif %}
 
 <form method="post" action="/grade/{{ period }}/{{ target.student_id }}" style="margin-top: 24px; max-width: 640px;">

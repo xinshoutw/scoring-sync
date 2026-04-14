@@ -18,6 +18,10 @@ from net_grading.sync.local import (
     list_submission_history,
     upsert_targets_cache,
 )
+from net_grading.sync.orchestrator import (
+    latest_logs_for_submission,
+    sync_one_submission,
+)
 from sqlalchemy import select
 
 
@@ -117,6 +121,14 @@ async def grade_form(
         "teamwork": latest.score_teamwork if latest else SCORE_MAX["teamwork"],
     }
 
+    # 同步狀態：若有 saved_id 就拿那筆的；否則拿最新 submission 的
+    sync_of_submission_id = saved_id or (latest.id if latest else None)
+    sync_status = (
+        await latest_logs_for_submission(db, sync_of_submission_id)
+        if sync_of_submission_id
+        else {}
+    )
+
     return templates.TemplateResponse(
         request,
         "grade.html",
@@ -134,6 +146,8 @@ async def grade_form(
             "self_note": latest.self_note if latest else "",
             "history": history,
             "saved_id": saved_id,
+            "sync_submission_id": sync_of_submission_id,
+            "sync_status": sync_status,
         },
     )
 
@@ -185,8 +199,49 @@ async def grade_submit(
         source="local",
     )
 
+    # 阻塞並行送出三站（~2-3 秒）
+    await sync_one_submission(
+        db,
+        user,
+        grader_name=user.name,
+        submission=saved,
+        target_name=target_row.name,
+    )
+
     return RedirectResponse(
         f"/grade/{period}/{target_id}?saved_id={saved.id}", status_code=303
+    )
+
+
+@router.post("/sync/{submission_id}/retry/{site}")
+async def sync_retry(
+    submission_id: int = Path(..., ge=1),
+    site: str = Path(..., pattern=r"^site[123]$"),
+    user: CurrentUser = Depends(require_user),
+    db: AsyncSession = Depends(get_session),
+) -> Response:
+    from net_grading.db.models import Submission
+
+    sub = await db.get(Submission, submission_id)
+    if sub is None or sub.user_id != user.user_id:
+        raise HTTPException(status_code=404, detail="submission_not_found")
+
+    target_row = await db.get(
+        TargetCache, (user.user_id, sub.period, sub.target_student_id)
+    )
+    target_name = target_row.name if target_row else sub.target_student_id
+
+    await sync_one_submission(
+        db,
+        user,
+        grader_name=user.name,
+        submission=sub,
+        target_name=target_name,
+        sites=(site,),  # type: ignore[arg-type]
+    )
+    return RedirectResponse(
+        f"/grade/{sub.period}/{sub.target_student_id}?saved_id={sub.id}",
+        status_code=303,
     )
 
 
