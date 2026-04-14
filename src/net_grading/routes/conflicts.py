@@ -2,12 +2,14 @@ import json
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Path, Request
 from fastapi.responses import RedirectResponse, Response
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from net_grading.auth.middleware import require_user
 from net_grading.auth.session import CurrentUser
 from net_grading.config import get_settings
 from net_grading.db.engine import get_session
+from net_grading.db.models import TargetCache
 from net_grading.routes.templating import templates
 from net_grading.sync.pull import (
     list_pending_conflicts,
@@ -25,16 +27,33 @@ async def conflicts_page(
     db: AsyncSession = Depends(get_session),
 ) -> Response:
     rows = await list_pending_conflicts(db, user.user_id)
-    items = [
-        {
-            "id": r.id,
-            "period": r.period,
-            "target_student_id": r.target_student_id,
-            "site1": json.loads(r.site1_snapshot),
-            "site2": json.loads(r.site2_snapshot),
-        }
-        for r in rows
-    ]
+
+    # 一次撈該使用者所有 targets_cache，記憶體裡 lookup 名字 / 班級
+    cache_rows = (
+        await db.execute(
+            select(TargetCache).where(TargetCache.user_id == user.user_id)
+        )
+    ).scalars().all()
+    name_map: dict[tuple[str, str], tuple[str, str]] = {
+        (c.period, c.target_student_id): (c.name, c.class_name) for c in cache_rows
+    }
+
+    items = []
+    for r in rows:
+        name, class_name = name_map.get(
+            (r.period, r.target_student_id), ("", "")
+        )
+        items.append(
+            {
+                "id": r.id,
+                "period": r.period,
+                "target_student_id": r.target_student_id,
+                "target_name": name,
+                "target_class_name": class_name,
+                "site1": json.loads(r.site1_snapshot),
+                "site2": json.loads(r.site2_snapshot),
+            }
+        )
     cfg = get_settings()
     return templates.TemplateResponse(
         request,

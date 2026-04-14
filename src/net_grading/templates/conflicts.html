@@ -15,7 +15,13 @@
 {% for item in items %}
 <section class="card">
     <div class="row-between" style="margin-bottom: 16px;">
-        <strong class="mono" style="font-size: 16px;">{{ item.target_student_id }}</strong>
+        <div class="row" style="gap: 10px; align-items: baseline;">
+            <strong style="font-size: 16px;">{{ item.target_name or item.target_student_id }}</strong>
+            <span class="muted mono" style="font-size: 13px;">{{ item.target_student_id }}</span>
+            {% if item.target_class_name %}
+            <span class="muted" style="font-size: 13px;">· {{ item.target_class_name }}</span>
+            {% endif %}
+        </div>
         <span class="pill">{{ item.period }}</span>
     </div>
     <div class="grid-2">
@@ -45,7 +51,7 @@
     </div>
     <form method="post" action="/conflicts/{{ item.id }}/resolve" style="margin-top: 10px;">
         <input type="hidden" name="choice" value="skip">
-        <button type="submit" class="btn" style="width: 100%; justify-content: center;">跳過這筆（兩邊都不匯入）</button>
+        <button type="submit" class="btn" style="width: 100%; justify-content: center;">跳過這筆</button>
     </form>
 </section>
 {% endfor %}
