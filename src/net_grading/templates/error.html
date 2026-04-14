@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}{{ title }} · 評分系統{% endblock %}
+{% block content %}
+<div style="max-width: 480px; margin: 80px auto 0; text-align: center;">
+    <div class="mono accent-gradient-text" style="font-size: 64px; font-weight: 800; letter-spacing: -0.04em; line-height: 1;">
+        {{ code }}
+    </div>
+    <h1 style="margin-top: 16px; font-size: 24px;">{{ title }}</h1>
+    <p class="muted" style="margin-top: 8px;">{{ message }}</p>
+    <div style="margin-top: 28px;">
+        <a href="/" class="btn primary">回首頁</a>
+    </div>
+</div>
+{% endblock %}
