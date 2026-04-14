@@ -10,8 +10,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from net_grading.auth.session import CurrentUser
 from net_grading.auth.site2_creds import get_id_token
-from net_grading.db.models import ConflictEvent, Submission
-from net_grading.sites.base import Period, ScoreCard, SubmissionSnapshot
+from net_grading.db.models import ConflictEvent, Submission, TargetCache
+from net_grading.sites.base import Period, ScoreCard, SiteName, SubmissionSnapshot
 from net_grading.sites.errors import SiteError
 from net_grading.sites.site1 import Site1Client
 from net_grading.sites.site2 import Site2Client
@@ -160,6 +160,7 @@ async def resolve_conflict(
     conflict_id: int,
     choice: str,
 ) -> None:
+    """選 site1 → 把值寫回 site2（反之亦然）；skip 不動。"""
     if choice not in ("site1", "site2", "skip"):
         raise ValueError("invalid_choice")
 
@@ -184,7 +185,7 @@ async def resolve_conflict(
         presentation=data["scores"]["presentation"],
         teamwork=data["scores"]["teamwork"],
     )
-    await insert_local_submission(
+    submission = await insert_local_submission(
         db,
         user.user_id,
         conflict.period,
@@ -197,6 +198,27 @@ async def resolve_conflict(
     conflict.resolution = choice
     conflict.resolved_at = datetime.utcnow()
     await db.commit()
+
+    # 對齊：把選中版本 push 回敗方站台，讓三站一致
+    target_row = await db.get(
+        TargetCache,
+        (user.user_id, conflict.period, conflict.target_student_id),
+    )
+    target_name = target_row.name if target_row else conflict.target_student_id
+
+    opposite: SiteName = "site2" if choice == "site1" else "site1"  # type: ignore[assignment]
+    # lazy import 避免循環
+    from net_grading.sync.orchestrator import sync_one_submission
+
+    await sync_one_submission(
+        db,
+        grader_id=user.user_id,
+        grader_name=user.name,
+        site1_sid=user.site1_sid,
+        submission=submission,
+        target_name=target_name,
+        sites=(opposite,),
+    )
 
 
 def _same_scores(a: SubmissionSnapshot, b: SubmissionSnapshot) -> bool:
