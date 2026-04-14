@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}衝突解決 · net-grading{% endblock %}
+{% block content %}
+<h1>衝突解決</h1>
+{% if items %}
+<p class="muted">Site1 與 Site2 的紀錄不一致。每位被評學生選擇要採用的版本。</p>
+{% else %}
+<p class="muted" style="margin-top: 24px;">✓ 目前沒有待處理的衝突。</p>
+<p style="margin-top: 16px;"><a href="/dashboard">返回 Dashboard →</a></p>
+{% endif %}
+
+{% for item in items %}
+<section style="margin-top: 32px; padding: 16px; border: 1px solid var(--border); border-radius: 8px;">
+    <div style="display: flex; justify-content: space-between; align-items: baseline;">
+        <strong style="font-size: 16px;">{{ item.target_student_id }}</strong>
+        <span class="muted">{{ item.period }}</span>
+    </div>
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px;">
+        {% for side_key, side in [('site1', item.site1), ('site2', item.site2)] %}
+        <div style="padding: 12px; border: 1px solid var(--border); border-radius: 6px;">
+            <div style="display: flex; justify-content: space-between; align-items: baseline;">
+                <strong>{{ side_key | capitalize }}</strong>
+                <span style="font-family: ui-monospace, monospace; font-weight: 600;">
+                    {{ side.scores.topic + side.scores.content + side.scores.narrative + side.scores.presentation + side.scores.teamwork }}/100
+                </span>
+            </div>
+            <div style="margin-top: 8px; font-family: ui-monospace, monospace; font-size: 13px;">
+                主題 {{ side.scores.topic }} · 內容 {{ side.scores.content }} · 敘述 {{ side.scores.narrative }} · 表現 {{ side.scores.presentation }} · 團隊 {{ side.scores.teamwork }}
+            </div>
+            <div class="muted" style="margin-top: 8px; font-size: 12px;">
+                送出：{{ side.submitted_at[:19] }}
+            </div>
+            {% if side.comment %}
+            <div style="margin-top: 8px; font-size: 13px;">評語：{{ side.comment }}</div>
+            {% endif %}
+            <form method="post" action="/conflicts/{{ item.id }}/resolve" style="margin-top: 12px;">
+                <input type="hidden" name="choice" value="{{ side_key }}">
+                <button type="submit" class="primary" style="width: 100%;">採用 {{ side_key | capitalize }} 版本</button>
+            </form>
+        </div>
+        {% endfor %}
+    </div>
+    <form method="post" action="/conflicts/{{ item.id }}/resolve" style="margin-top: 12px;">
+        <input type="hidden" name="choice" value="skip">
+        <button type="submit" style="width: 100%;">跳過這筆（兩個都不匯入）</button>
+    </form>
+</section>
+{% endfor %}
+{% endblock %}

@@ -19,6 +19,19 @@
 <p class="error" style="margin-top: 16px;">Site1 重整失敗：{{ reload_error }}（顯示的是本地快取）</p>
 {% endif %}
 
+{% if import_summary and import_summary.get('skipped') is none %}
+    {% set s = import_summary %}
+    {% if s.imported_site1 or s.imported_site2 or s.agreements %}
+    <p style="margin-top: 16px; padding: 10px 14px; border: 1px solid var(--accent); border-radius: 6px; font-size: 13px;">
+        首次匯入完成：
+        Site1 單邊 {{ s.imported_site1 }} 筆 · Site2 單邊 {{ s.imported_site2 }} 筆 · 兩邊一致 {{ s.agreements }} 筆
+    </p>
+    {% endif %}
+    {% if s.errors %}
+    <p class="error" style="margin-top: 12px; font-size: 13px;">匯入部分失敗：{{ s.errors }}</p>
+    {% endif %}
+{% endif %}
+
 <p class="muted" style="margin-top: 24px;">
     {{ targets | length }} 位待評 · 已評 {{ evaluated_count }} · 未評 {{ targets | length - evaluated_count }}
 </p>

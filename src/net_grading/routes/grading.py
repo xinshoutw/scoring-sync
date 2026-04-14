@@ -22,6 +22,7 @@ from net_grading.sync.orchestrator import (
     latest_logs_for_submission,
     sync_one_submission,
 )
+from net_grading.sync.pull import initial_import, pending_conflicts_count
 from sqlalchemy import select
 
 
@@ -75,6 +76,15 @@ async def dashboard(
         periods = ()
 
     reload_error = await _refresh_targets_if_needed(db, user, period)
+
+    # 首次匯入（僅當本地該期別為空時觸發一次）
+    import_summary = await initial_import(db, user, period)
+
+    # 如有 pending 衝突，強制導向 /conflicts
+    pending = await pending_conflicts_count(db, user.user_id)
+    if pending > 0:
+        return RedirectResponse("/conflicts", status_code=303)
+
     targets = await list_dashboard_targets(db, user.user_id, period)
     evaluated_count = sum(1 for t in targets if t.local_total is not None)
     period_label = next((p.label for p in periods if p.code == period), period)
@@ -90,6 +100,7 @@ async def dashboard(
             "targets": targets,
             "evaluated_count": evaluated_count,
             "reload_error": reload_error,
+            "import_summary": import_summary,
         },
     )
 
