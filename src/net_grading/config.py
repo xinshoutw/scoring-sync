@@ -25,7 +25,7 @@ class Settings(BaseSettings):
     # UI 顯示用：三站對應的同學名稱
     site1_label: str = "王敬愷的評分系統"
     site2_label: str = "張銘元的評分系統"
-    site3_label: str = "劉國豪的評分系統"
+    site3_label: str = "羅國豪的評分系統"
 
     # 分組：JSON array of arrays, e.g. [["B11315009","B11315010"],["B11315011"]]
     student_groups: list[list[str]] = Field(default_factory=list)
