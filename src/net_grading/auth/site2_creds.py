@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from net_grading.crypto import decrypt, encrypt
 from net_grading.db.models import Site2Credential
-from net_grading.sites.errors import SiteLoginError, SiteTokenExpired
+from net_grading.sites.errors import SiteTokenExpired
 from net_grading.sites.site2 import Site2Client, Site2LoginResult
 
 

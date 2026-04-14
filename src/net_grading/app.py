@@ -35,6 +35,26 @@ def _prefers_html(request: Request) -> bool:
     return "text/html" in accept or "*/*" in accept
 
 
+def _html_error(
+    request: Request,
+    *,
+    code: int,
+    title: str,
+    message: str,
+) -> Response:
+    return templates.TemplateResponse(
+        request,
+        "error.html",
+        {
+            "user": getattr(request.state, "user", None),
+            "code": code,
+            "title": title,
+            "message": message,
+        },
+        status_code=code,
+    )
+
+
 def create_app() -> FastAPI:
     settings = get_settings()
     app = FastAPI(
@@ -59,19 +79,28 @@ def create_app() -> FastAPI:
             resp = RedirectResponse("/login", status_code=303)
             resp.delete_cookie(SESSION_COOKIE, path="/")
             return resp
-        # 404：HTML 友善錯誤頁（API 請求仍吐 JSON）
-        if exc.status_code == 404 and _prefers_html(request):
-            return templates.TemplateResponse(
-                request,
-                "error.html",
-                {
-                    "user": None,
-                    "code": 404,
-                    "title": "找不到頁面",
-                    "message": "這個網址不存在或已搬家。",
-                },
-                status_code=404,
-            )
+        if _prefers_html(request):
+            if exc.status_code == 403 and exc.detail == "period_closed":
+                return _html_error(
+                    request,
+                    code=403,
+                    title="期別未開放",
+                    message="這個期別目前不接受評分或同步重試。",
+                )
+            if exc.status_code == 404:
+                return _html_error(
+                    request,
+                    code=404,
+                    title="找不到頁面",
+                    message="這個網址不存在或已搬家。",
+                )
+            if exc.status_code == 503 and str(exc.detail).startswith("period_lookup_failed:"):
+                return _html_error(
+                    request,
+                    code=503,
+                    title="暫時無法驗證期別",
+                    message="目前無法連線到 Site1 驗證期別狀態，請稍後再試。",
+                )
         return await http_exception_handler(request, exc)
 
     @app.get("/health")

@@ -31,6 +31,13 @@ USER_AGENT = "xinshoutw-scoring-sync/0.1 (+https://github.com/xinshoutw/scoring-
 SID_TTL = timedelta(hours=24)
 
 
+def _json_or_raise(response: httpx.Response, op: str) -> Any:
+    try:
+        return response.json()
+    except ValueError as exc:
+        raise SiteTransportError(f"{op}_invalid_json:{response.text[:200]}") from exc
+
+
 @dataclass(frozen=True)
 class Site1LoginResult:
     identity: StudentIdentity
@@ -101,12 +108,15 @@ class Site1Client:
     async def me(self, sid: str) -> StudentIdentity:
         """驗證 sid 仍然有效，同時取回最新身份（periods 可能變更 is_open）。"""
         async with self._client(sid) as client:
-            r = await client.get("/api/auth/me")
+            try:
+                r = await client.get("/api/auth/me")
+            except httpx.HTTPError as exc:
+                raise SiteTransportError(str(exc)) from exc
             if r.status_code == 401:
                 raise SiteTokenExpired("sid_expired")
             if r.status_code != 200:
                 raise SiteTransportError(f"me_failed_{r.status_code}")
-            body = r.json()
+            body = _json_or_raise(r, "me")
             if body.get("role") != "student":
                 raise SiteUnsupportedRole(f"role={body.get('role')}")
             periods = tuple(
@@ -122,7 +132,10 @@ class Site1Client:
 
     async def list_targets(self, sid: str, period: Period) -> list[Target]:
         async with self._client(sid) as client:
-            r = await client.get(f"/api/student/targets?period={period}")
+            try:
+                r = await client.get(f"/api/student/targets?period={period}")
+            except httpx.HTTPError as exc:
+                raise SiteTransportError(str(exc)) from exc
             if r.status_code == 401:
                 raise SiteTokenExpired("sid_expired")
             if r.status_code != 200:
@@ -135,7 +148,7 @@ class Site1Client:
                     evaluated=bool(t["evaluated"]),
                     total=t["total"],
                 )
-                for t in r.json()
+                for t in _json_or_raise(r, "targets")
             ]
 
     async def fetch_submission(
@@ -143,16 +156,19 @@ class Site1Client:
     ) -> SubmissionSnapshot | None:
         """回 None 表示尚未評分。"""
         async with self._client(sid) as client:
-            r = await client.get(
-                f"/api/student/submissions/{period}/{target_id}/detail"
-            )
+            try:
+                r = await client.get(
+                    f"/api/student/submissions/{period}/{target_id}/detail"
+                )
+            except httpx.HTTPError as exc:
+                raise SiteTransportError(str(exc)) from exc
             if r.status_code == 401:
                 raise SiteTokenExpired("sid_expired")
             if r.status_code == 404:
                 return None
             if r.status_code != 200:
                 raise SiteTransportError(f"detail_failed_{r.status_code}")
-            body = r.json()
+            body = _json_or_raise(r, "detail")
             latest = body.get("latest")
             if not latest:
                 return None
@@ -198,12 +214,15 @@ class Site1Client:
             "self_note": self_note,
         }
         async with self._client(sid) as client:
-            r = await client.post("/api/student/submissions", json=payload)
+            try:
+                r = await client.post("/api/student/submissions", json=payload)
+            except httpx.HTTPError as exc:
+                raise SiteTransportError(str(exc)) from exc
             if r.status_code == 401:
                 raise SiteTokenExpired("sid_expired")
             if r.status_code >= 400:
                 raise SiteTransportError(f"submit_failed_{r.status_code}:{r.text[:200]}")
-            body = r.json()
+            body = _json_or_raise(r, "submit")
             return SubmitResult(
                 external_id=str(body.get("id")),
                 raw_response=r.text[:4000],

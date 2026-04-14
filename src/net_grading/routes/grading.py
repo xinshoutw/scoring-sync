@@ -9,7 +9,7 @@ from net_grading.config import get_settings
 from net_grading.db.engine import get_session
 from net_grading.db.models import TargetCache
 from net_grading.routes.templating import templates
-from net_grading.sites.base import Period, ScoreCard
+from net_grading.sites.base import Period, PeriodInfo, ScoreCard
 from net_grading.sites.errors import SiteError, SiteTokenExpired
 from net_grading.sites.site1 import Site1Client
 from net_grading.sync.local import (
@@ -25,7 +25,6 @@ from net_grading.sync.orchestrator import (
     latest_logs_for_submission,
     preinsert_pending,
     run_sync_background,
-    sync_one_submission,
 )
 from net_grading.sync.pull import (
     initial_import,
@@ -46,6 +45,27 @@ router = APIRouter()
 async def _load_periods_from_user(site1_sid: str):
     """呼叫 Site1 /me 拿最新 periods（含 is_open）."""
     return (await Site1Client().me(site1_sid)).periods
+
+
+def _period_info(periods: tuple[PeriodInfo, ...], period: Period) -> PeriodInfo | None:
+    return next((item for item in periods if item.code == period), None)
+
+
+async def _ensure_period_open(user: CurrentUser, period: Period) -> None:
+    """403 period_closed / 400 invalid_period / 503 period_lookup_failed / 401 重登。
+    403 + 503 的友善 HTML 錯誤頁由 app.py 的 exception handler 統一渲染。"""
+    try:
+        periods = await _load_periods_from_user(user.site1_sid)
+    except SiteTokenExpired:
+        raise HTTPException(status_code=401, detail="sid_expired") from None
+    except SiteError as exc:
+        raise HTTPException(status_code=503, detail=f"period_lookup_failed:{exc}") from exc
+
+    current = _period_info(periods, period)
+    if current is None:
+        raise HTTPException(status_code=400, detail="invalid_period")
+    if not current.is_open:
+        raise HTTPException(status_code=403, detail="period_closed")
 
 
 async def _refresh_targets_if_needed(
@@ -191,6 +211,7 @@ async def grade_form(
 ) -> Response:
     if period not in ("midterm", "final"):
         raise HTTPException(status_code=400, detail="invalid_period")
+    await _ensure_period_open(user, period)
 
     target_row = await db.get(TargetCache, (user.user_id, period, target_id))
     if target_row is None:
@@ -262,6 +283,7 @@ async def grade_submit(
 ) -> Response:
     if period not in ("midterm", "final"):
         raise HTTPException(status_code=400, detail="invalid_period")
+    await _ensure_period_open(user, period)
     target_row = await db.get(TargetCache, (user.user_id, period, target_id))
     if target_row is None:
         raise HTTPException(status_code=404, detail="target_not_in_list")
@@ -330,6 +352,7 @@ async def grade_submit(
 
 @router.post("/sync/{submission_id}/retry/{site}")
 async def sync_retry(
+    request: Request,
     submission_id: int = Path(..., ge=1),
     site: str = Path(..., pattern=r"^site[123]$"),
     user: CurrentUser = Depends(require_user),
@@ -340,6 +363,7 @@ async def sync_retry(
     sub = await db.get(Submission, submission_id)
     if sub is None or sub.user_id != user.user_id:
         raise HTTPException(status_code=404, detail="submission_not_found")
+    await _ensure_period_open(user, sub.period)
 
     target_row = await db.get(
         TargetCache, (user.user_id, sub.period, sub.target_student_id)
@@ -395,7 +419,8 @@ async def sync_events(
             # 如果全部都已經完成，直接關
             logs_after = await latest_logs_for_submission(db, submission_id)
             if logs_after and all(
-                l.status in ("success", "failed", "skipped") for l in logs_after.values()
+                log_row.status in ("success", "failed", "skipped")
+                for log_row in logs_after.values()
             ):
                 yield {"event": "done", "data": "{}"}
                 return

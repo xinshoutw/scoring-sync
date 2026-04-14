@@ -36,6 +36,13 @@ FIRESTORE_BASE = "https://firestore.googleapis.com"
 USER_AGENT = "xinshoutw-scoring-sync/0.1 (+https://github.com/xinshoutw/scoring-sync)"
 
 
+def _json_or_raise(response: httpx.Response, op: str) -> Any:
+    try:
+        return response.json()
+    except ValueError as exc:
+        raise SiteTransportError(f"{op}_invalid_json:{response.text[:200]}") from exc
+
+
 @dataclass(frozen=True)
 class Site2LoginResult:
     email: str
@@ -129,9 +136,9 @@ class Site2Client:
             except httpx.HTTPError as exc:
                 raise SiteTransportError(str(exc)) from exc
             if r.status_code != 200:
-                err = r.json().get("error", {}).get("message", r.text[:200])
+                err = _json_or_raise(r, "login_error").get("error", {}).get("message", r.text[:200])
                 raise SiteLoginError(err)
-            body = r.json()
+            body = _json_or_raise(r, "login")
             expires_in = int(body.get("expiresIn", 3600))
             return Site2LoginResult(
                 email=body["email"],
@@ -152,9 +159,9 @@ class Site2Client:
             except httpx.HTTPError as exc:
                 raise SiteTransportError(str(exc)) from exc
             if r.status_code != 200:
-                err = r.json().get("error", {}).get("message", r.text[:200])
+                err = _json_or_raise(r, "refresh_error").get("error", {}).get("message", r.text[:200])
                 raise SiteTokenExpired(err)
-            body = r.json()
+            body = _json_or_raise(r, "refresh")
             expires_in = int(body.get("expires_in", 3600))
             return Site2RefreshResult(
                 id_token=body["id_token"],
@@ -191,10 +198,17 @@ class Site2Client:
             }
         }
         async with self._client() as c:
-            r = await c.post(url, headers={"authorization": f"Bearer {id_token}"}, json=query)
+            try:
+                r = await c.post(
+                    url,
+                    headers={"authorization": f"Bearer {id_token}"},
+                    json=query,
+                )
+            except httpx.HTTPError as exc:
+                raise SiteTransportError(str(exc)) from exc
             if r.status_code != 200:
                 return None  # 權限被擋或其他錯誤 → 當作沒有現有紀錄，走 create
-            rows = r.json()
+            rows = _json_or_raise(r, "find_existing_grade")
             for row in rows:
                 doc = row.get("document")
                 if doc:
@@ -261,7 +275,7 @@ class Site2Client:
                 raise SiteTransportError(
                     f"firestore_write_failed_{r.status_code}:{r.text[:300]}"
                 )
-            body = r.json()
+            body = _json_or_raise(r, "submit")
             doc_name = body.get("name", existing_id or "")
             return SubmitResult(external_id=doc_name, raw_response=r.text[:4000])
 
@@ -288,7 +302,14 @@ class Site2Client:
             }
         }
         async with self._client() as c:
-            r = await c.post(url, headers={"authorization": f"Bearer {id_token}"}, json=query)
+            try:
+                r = await c.post(
+                    url,
+                    headers={"authorization": f"Bearer {id_token}"},
+                    json=query,
+                )
+            except httpx.HTTPError as exc:
+                raise SiteTransportError(str(exc)) from exc
             if r.status_code == 401:
                 raise SiteTokenExpired("id_token_expired")
             if r.status_code in (403, 404):
@@ -297,7 +318,7 @@ class Site2Client:
                 raise SiteTransportError(
                     f"firestore_query_failed_{r.status_code}:{r.text[:200]}"
                 )
-            rows = r.json()
+            rows = _json_or_raise(r, "list_submissions")
             latest: dict[str, SubmissionSnapshot] = {}
             for row in rows:
                 doc = row.get("document")

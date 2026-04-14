@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from net_grading.auth.site2_creds import get_id_token
 from net_grading.db.engine import get_session_factory
-from net_grading.db.models import Submission, SyncLog, TargetCache, User, utcnow
+from net_grading.db.models import Submission, SyncLog, utcnow
 from net_grading.sites.base import ScoreCard, SiteName
 from net_grading.sites.errors import SiteError, SiteTokenExpired
 from net_grading.sites.site1 import Site1Client
@@ -64,7 +64,16 @@ async def sync_one_submission(
     scores = _scores_of(submission)
     tasks = [
         asyncio.create_task(
-            _dispatch(site, db, grader_id, grader_name, site1_sid, submission, target_name, scores)
+            _dispatch_safe(
+                site,
+                db,
+                grader_id,
+                grader_name,
+                site1_sid,
+                submission,
+                target_name,
+                scores,
+            )
         )
         for site in sites
     ]
@@ -175,6 +184,31 @@ async def _dispatch(
     return _fail(site, time.monotonic(), None, "unknown_site", None)
 
 
+async def _dispatch_safe(
+    site: SiteName,
+    db: AsyncSession,
+    grader_id: str,
+    grader_name: str,
+    site1_sid: str,
+    sub: Submission,
+    target_name: str,
+    scores: ScoreCard,
+) -> SiteResult:
+    t0 = time.monotonic()
+    try:
+        return await _dispatch(
+            site, db, grader_id, grader_name, site1_sid, sub, target_name, scores
+        )
+    except Exception as exc:  # pragma: no cover - 最後一道防線，避免單站異常拖垮整體同步
+        return _fail(
+            site,
+            t0,
+            None,
+            f"unexpected_{type(exc).__name__}:{str(exc)[:200]}",
+            None,
+        )
+
+
 async def _do_site1(site1_sid: str, sub: Submission, scores: ScoreCard) -> SiteResult:
     t0 = time.monotonic()
     try:
@@ -197,18 +231,18 @@ async def _do_site2(
     scores: ScoreCard,
 ) -> SiteResult:
     t0 = time.monotonic()
-    id_token = await get_id_token(db, grader_id)
-    if id_token is None:
-        return SiteResult(
-            site="site2",
-            status="skipped",
-            http_status=None,
-            external_id=None,
-            error="site2_not_connected",
-            duration_ms=int((time.monotonic() - t0) * 1000),
-            response_body=None,
-        )
     try:
+        id_token = await get_id_token(db, grader_id)
+        if id_token is None:
+            return SiteResult(
+                site="site2",
+                status="skipped",
+                http_status=None,
+                external_id=None,
+                error="site2_not_connected",
+                duration_ms=int((time.monotonic() - t0) * 1000),
+                response_body=None,
+            )
         result = await Site2Client().submit(
             id_token,
             grader_id=grader_id,

@@ -1,16 +1,13 @@
 """首次匯入與衝突偵測：Site1 優先名單 + Site2 可選，按被評學生比對."""
 import asyncio
 import json
-from dataclasses import asdict
-from datetime import datetime
-from typing import Iterable
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from net_grading.auth.session import CurrentUser
 from net_grading.auth.site2_creds import get_id_token
-from net_grading.db.models import ConflictEvent, Submission, TargetCache
+from net_grading.db.models import ConflictEvent, Submission, TargetCache, utcnow
 from net_grading.sites.base import Period, ScoreCard, SiteName, SubmissionSnapshot
 from net_grading.sites.errors import SiteError
 from net_grading.sites.site1 import Site1Client
@@ -65,14 +62,14 @@ async def initial_import(
             site1_by_target[snap.target_student_id] = snap
 
     site2_by_target: dict[str, SubmissionSnapshot] = {}
-    id_token = await get_id_token(db, user.user_id)
-    if id_token is not None:
-        try:
+    try:
+        id_token = await get_id_token(db, user.user_id)
+        if id_token is not None:
             s2_list = await Site2Client().list_submissions(id_token, user.user_id, period)
             for snap in s2_list:
                 site2_by_target[snap.target_student_id] = snap
-        except SiteError as exc:
-            errors["site2_list"] = str(exc)
+    except SiteError as exc:
+        errors["site2_list"] = str(exc)
 
     imported_site1 = 0
     imported_site2 = 0
@@ -183,14 +180,14 @@ async def recheck_conflicts(
     site1_by_target = {s.target_student_id: s for s in s1_list if s is not None}
 
     site2_by_target: dict = {}
-    id_token = await get_id_token(db, user_id)
-    if id_token is not None:
-        try:
+    try:
+        id_token = await get_id_token(db, user_id)
+        if id_token is not None:
             s2_list = await Site2Client().list_submissions(id_token, user_id, period)
             for snap in s2_list:
                 site2_by_target[snap.target_student_id] = snap
-        except SiteError:
-            pass
+    except SiteError:
+        pass
 
     # 抓現有 conflicts (含 skip) 做 dedupe / 對齊後的清掃
     existing_stmt = select(ConflictEvent).where(
@@ -272,7 +269,7 @@ async def resolve_conflict(
 
     if choice == "skip":
         conflict.resolution = "skip"
-        conflict.resolved_at = datetime.utcnow()
+        conflict.resolved_at = utcnow()
         await db.commit()
         return
 
@@ -296,7 +293,7 @@ async def resolve_conflict(
         source=f"imported_{choice}",
     )
     conflict.resolution = choice
-    conflict.resolved_at = datetime.utcnow()
+    conflict.resolved_at = utcnow()
     await db.commit()
 
     # 對齊：把選中版本 push 回敗方站台，讓三站一致

@@ -1,5 +1,4 @@
 """Dashboard 背景 recheck 節流閥：per-user in-flight lock + 30s 最小間隔。"""
-import asyncio
 import logging
 import time
 
