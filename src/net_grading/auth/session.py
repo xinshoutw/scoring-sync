@@ -24,6 +24,19 @@ class CurrentUser:
     site1_sid: str
     site1_sid_expires_at: datetime
     expires_at: datetime
+    sync_site1: bool
+    sync_site2: bool
+    sync_site3: bool
+
+    def enabled_sites(self) -> tuple[str, ...]:
+        out: list[str] = []
+        if self.sync_site1:
+            out.append("site1")
+        if self.sync_site2:
+            out.append("site2")
+        if self.sync_site3:
+            out.append("site3")
+        return tuple(out)
 
 
 async def create_session(
@@ -85,6 +98,9 @@ async def load_session(db: AsyncSession, session_id: str) -> CurrentUser | None:
         site1_sid=decrypt(s.site1_sid_enc),
         site1_sid_expires_at=_aware(s.site1_sid_expires_at),
         expires_at=expires,
+        sync_site1=bool(user.sync_site1),
+        sync_site2=bool(user.sync_site2),
+        sync_site3=bool(user.sync_site3),
     )
 
 

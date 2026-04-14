@@ -18,48 +18,39 @@
 
 {% if error %}<p class="error" style="margin-top: 16px;">{{ error }}</p>{% endif %}
 
-{% if sync_submission_id %}
+{% if sync_status %}
 {% set color_map = {'success': 'success', 'failed': 'failed', 'pending': 'pending', 'skipped': 'skipped'} %}
 {% set label_map = {'success': '✓', 'failed': '✗', 'pending': '⏳', 'skipped': '—'} %}
 <section class="card-hi" style="margin-top: 20px;">
-    <div class="row-between" style="margin-bottom: 12px;">
-        <h2 style="margin: 0;">同步狀態</h2>
-        <span class="subtle mono" style="font-size: 12px;">submission #{{ sync_submission_id }}</span>
-    </div>
-    <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+    <h2 style="margin: 0 0 14px;">同步狀態</h2>
+    <div class="stack" style="gap: 8px;">
         {% for site in ['site1', 'site2', 'site3'] %}
             {% set log = sync_status.get(site) %}
-            {% set status = log.status if log else 'pending' %}
-            <div class="row" style="gap: 8px;">
-                <span class="pill {{ color_map.get(status, 'pending') }}">
-                    <strong>{{ label_map.get(status, '?') }}</strong>
-                    {{ site | capitalize }}
-                    {% if log %}
-                    <span class="subtle mono" style="font-size: 11px;">{{ log.duration_ms }}ms</span>
-                    {% endif %}
-                </span>
-                {% if log and log.external_id %}
-                <span class="subtle mono" style="font-size: 11px;">→ {{ log.external_id[:20] }}{% if log.external_id|length > 20 %}…{% endif %}</span>
-                {% endif %}
-                {% if log and status == 'failed' %}
+            {% if log %}
+            {% set status = log.status %}
+            <div class="row-between">
+                <div class="row" style="gap: 10px;">
+                    <span class="pill {{ color_map.get(status, 'pending') }}">
+                        <strong>{{ label_map.get(status, '?') }}</strong>
+                        {{ site_labels[site] }}
+                    </span>
+                </div>
+                {% if status == 'failed' %}
                 <form method="post" action="/sync/{{ sync_submission_id }}/retry/{{ site }}" style="margin: 0;">
                     <button type="submit" class="btn" style="padding: 3px 10px; font-size: 12px;">重試</button>
                 </form>
                 {% endif %}
             </div>
+            {% if log.error_message and status == 'failed' %}
+            <p class="subtle" style="font-size: 12px; margin-left: 4px;">
+                {{ log.error_message[:240] }}
+            </p>
+            {% endif %}
+            {% endif %}
         {% endfor %}
     </div>
-    {% for site, log in sync_status.items() %}
-        {% if log.error_message %}
-        <p class="mono subtle" style="margin-top: 10px; font-size: 11px;">
-            {{ site }}: {{ log.error_message[:280] }}
-        </p>
-        {% endif %}
-    {% endfor %}
 </section>
 {% endif %}
-
-{% if saved_id %}<p class="subtle" style="margin-top: 12px; font-size: 13px;">✓ 本地儲存完成（submission id = {{ saved_id }}）</p>{% endif %}
 
 <form method="post" action="/grade/{{ period }}/{{ target.student_id }}" class="card" style="margin-top: 24px; max-width: 720px;">
     {% with field='topic', label='主題掌握', max=30, value=scores.topic %}
@@ -86,17 +77,17 @@
     </div>
 
     <div style="margin-top: 24px;">
-        <label for="comment">評語（選填，會同步到 Site1 / Site2 / Site3）</label>
+        <label for="comment">評語（選填）</label>
         <textarea id="comment" name="comment" rows="3">{{ comment | default('') }}</textarea>
     </div>
 
     <div style="margin-top: 16px;">
-        <label for="self_note">自備備註（選填，僅本地 + Site1）</label>
+        <label for="self_note">自備備註（選填）</label>
         <textarea id="self_note" name="self_note" rows="2">{{ self_note | default('') }}</textarea>
     </div>
 
     <button type="submit" class="btn primary" style="margin-top: 24px; width: 100%; justify-content: center; padding: 12px;">
-        送出並同步三站
+        送出並同步
     </button>
 </form>
 

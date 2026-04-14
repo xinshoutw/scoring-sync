@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from net_grading.auth.middleware import optional_user, require_user
 from net_grading.auth.session import CurrentUser
 from net_grading.auth.site2_creds import load_status as load_site2_status
+from net_grading.config import get_settings
 from net_grading.db.engine import get_session
 from net_grading.db.models import TargetCache
 from net_grading.routes.templating import templates
@@ -88,6 +89,10 @@ async def dashboard(
     period_label = next((p.label for p in periods if p.code == period), period)
     site2_status = await load_site2_status(db, user.user_id)
 
+    # 依 .env STUDENT_GROUPS 重排目標
+    cfg = get_settings()
+    grouped = _arrange_groups(targets, cfg.student_groups)
+
     return templates.TemplateResponse(
         request,
         "dashboard.html",
@@ -97,13 +102,36 @@ async def dashboard(
             "period_label": period_label,
             "periods": periods,
             "targets": targets,
+            "grouped_targets": grouped,
             "evaluated_count": evaluated_count,
             "reload_error": reload_error,
             "import_summary": import_summary,
             "site2": site2_status,
             "site2_error": site2_error,
+            "site_labels": {
+                "site1": cfg.site1_label,
+                "site2": cfg.site2_label,
+                "site3": cfg.site3_label,
+            },
         },
     )
+
+
+def _arrange_groups(targets, groups_cfg: list[list[str]]):
+    """回 [(label, [target]), ...]；groups_cfg 空時就一個無標籤的 section."""
+    by_id = {t.student_id: t for t in targets}
+    used: set[str] = set()
+    result: list[tuple[str, list]] = []
+    for idx, group_ids in enumerate(groups_cfg):
+        members = [by_id[sid] for sid in group_ids if sid in by_id]
+        if members:
+            result.append((f"第 {idx + 1} 組", members))
+            used.update(t.student_id for t in members)
+    leftover = [t for t in targets if t.student_id not in used]
+    if leftover:
+        label = "未分組" if result else ""
+        result.append((label, leftover))
+    return result
 
 
 @router.get("/grade/{period}/{target_id}")
@@ -141,6 +169,7 @@ async def grade_form(
         else {}
     )
 
+    cfg = get_settings()
     return templates.TemplateResponse(
         request,
         "grade.html",
@@ -160,6 +189,11 @@ async def grade_form(
             "saved_id": saved_id,
             "sync_submission_id": sync_of_submission_id,
             "sync_status": sync_status,
+            "site_labels": {
+                "site1": cfg.site1_label,
+                "site2": cfg.site2_label,
+                "site3": cfg.site3_label,
+            },
         },
     )
 

@@ -29,6 +29,9 @@ class User(Base):
     class_name: Mapped[str] = mapped_column(String(64))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     last_login_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    sync_site1: Mapped[int] = mapped_column(Integer, default=1)
+    sync_site2: Mapped[int] = mapped_column(Integer, default=1)
+    sync_site3: Mapped[int] = mapped_column(Integer, default=1)
 
 
 class Session(Base):

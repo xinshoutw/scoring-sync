@@ -1,5 +1,5 @@
-"""Site2 憑證的 POST 端點（GET 頁面已內嵌到 dashboard 側欄）."""
-from fastapi import APIRouter, Depends, Form
+"""同步偏好 / Site2 憑證相關 POST 端點（GET 頁面已內嵌到 dashboard）."""
+from fastapi import APIRouter, Depends, Form, Path
 from fastapi.responses import RedirectResponse, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -7,6 +7,7 @@ from net_grading.auth.middleware import require_user
 from net_grading.auth.session import CurrentUser
 from net_grading.auth.site2_creds import revoke, save_credentials
 from net_grading.db.engine import get_session
+from net_grading.db.models import User
 from net_grading.sites.errors import SiteLoginError, SiteTransportError
 from net_grading.sites.site2 import Site2Client
 
@@ -42,6 +43,22 @@ async def site2_revoke(
     period: str = Form("midterm"),
 ) -> Response:
     await revoke(db, user.user_id)
+    return RedirectResponse(f"/dashboard?period={period}", status_code=303)
+
+
+@router.post("/sync-prefs/{site}/toggle")
+async def sync_pref_toggle(
+    site: str = Path(..., pattern=r"^site[123]$"),
+    user: CurrentUser = Depends(require_user),
+    db: AsyncSession = Depends(get_session),
+    period: str = Form("midterm"),
+) -> Response:
+    row = await db.get(User, user.user_id)
+    if row is not None:
+        col = {"site1": "sync_site1", "site2": "sync_site2", "site3": "sync_site3"}[site]
+        cur = getattr(row, col)
+        setattr(row, col, 0 if cur else 1)
+        await db.commit()
     return RedirectResponse(f"/dashboard?period={period}", status_code=303)
 
 

@@ -1,7 +1,7 @@
 {% extends "base.html" %}
-{% block title %}Dashboard · net-grading{% endblock %}
+{% block title %}Dashboard · 評分系統{% endblock %}
 {% block content %}
-<div class="row-between" style="align-items: flex-end; margin-bottom: 8px;">
+<div class="row-between" style="align-items: flex-end; margin-bottom: 12px;">
     <div>
         <h1>{{ period_label or '期中報告' }}</h1>
         <p class="muted">{{ user.name }}（{{ user.class_name }}） · {{ user.user_id }}</p>
@@ -17,43 +17,51 @@
 </div>
 
 {% if reload_error %}
-<p class="error" style="margin-top: 16px;">Site1 重整失敗：{{ reload_error }}（顯示的是本地快取）</p>
+<p class="error" style="margin-top: 16px;">主要站台重整失敗：{{ reload_error }}</p>
 {% endif %}
 
 {% if import_summary and import_summary.get('skipped') is none %}
     {% set s = import_summary %}
     {% if s.imported_site1 or s.imported_site2 or s.agreements %}
     <p class="info-banner" style="margin-top: 16px;">
-        首次匯入完成：Site1 單邊 <strong>{{ s.imported_site1 }}</strong> 筆 · Site2 單邊 <strong>{{ s.imported_site2 }}</strong> 筆 · 兩邊一致 <strong>{{ s.agreements }}</strong> 筆
+        首次匯入完成：已載入 <strong>{{ (s.imported_site1 or 0) + (s.imported_site2 or 0) + (s.agreements or 0) }}</strong> 筆既有評分
     </p>
     {% endif %}
 {% endif %}
 
-<div style="display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 24px; margin-top: 24px; align-items: start;">
+<div style="display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 24px; margin-top: 20px; align-items: start;">
 
-    <!-- 主：學生列表 -->
-    <section class="card">
-        <div class="row-between" style="margin-bottom: 12px;">
+    <!-- 主：分組學生列表 -->
+    <section class="card" style="padding: 0;">
+        <div class="row-between" style="padding: 18px 22px 12px;">
             <h2 style="margin: 0;">待評列表</h2>
             <span class="muted mono" style="font-size: 13px;">
                 {{ targets | length }} 位 · 已評 {{ evaluated_count }} · 未評 {{ targets | length - evaluated_count }}
             </span>
         </div>
+
+        {% for group_label, group_targets in grouped_targets %}
+        {% if group_label %}
+        <div style="padding: 12px 22px; background: var(--surface-hi); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between;">
+            <strong style="font-size: 13px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--fg-muted);">{{ group_label }}</strong>
+            <span class="muted mono" style="font-size: 12px;">{{ group_targets | length }} 位</span>
+        </div>
+        {% endif %}
         <table>
             <thead>
                 <tr>
-                    <th>學號</th>
+                    <th style="padding-left: 22px;">學號</th>
                     <th>姓名</th>
                     <th>班級</th>
-                    <th style="text-align: right;">本地總分</th>
+                    <th style="text-align: right;">分數</th>
                     <th style="text-align: right;">更新</th>
-                    <th></th>
+                    <th style="padding-right: 22px;"></th>
                 </tr>
             </thead>
             <tbody>
-            {% for t in targets %}
+            {% for t in group_targets %}
                 <tr class="{% if t.is_self %}is-self{% endif %}">
-                    <td class="mono">{{ t.student_id }}</td>
+                    <td class="mono" style="padding-left: 22px;">{{ t.student_id }}</td>
                     <td>{{ t.name }}{% if t.is_self %} <span class="subtle">(自評)</span>{% endif %}</td>
                     <td class="muted">{{ t.class_name }}</td>
                     <td class="mono" style="text-align: right;">
@@ -64,7 +72,7 @@
                     <td class="mono subtle" style="text-align: right; font-size: 13px;">
                         {{ t.local_submitted_at.strftime('%m-%d %H:%M') if t.local_submitted_at else '—' }}
                     </td>
-                    <td style="text-align: right;">
+                    <td style="text-align: right; padding-right: 22px;">
                         <a href="/grade/{{ period }}/{{ t.student_id }}" class="btn">
                             {% if t.local_total is not none %}編輯{% else %}評分{% endif %} →
                         </a>
@@ -73,50 +81,90 @@
             {% endfor %}
             </tbody>
         </table>
+        {% endfor %}
     </section>
 
-    <!-- 側：Site2 連線 widget -->
-    <aside class="card">
-        <h2 style="margin-bottom: 4px;">Site2 連線</h2>
-        <p class="subtle" style="font-size: 12px; margin: 0 0 16px;">Firebase 帳號（ntust-grading）</p>
+    <!-- 側：三站同步控制 -->
+    <aside class="stack">
+        {% set site2_connected = site2 is not none %}
 
-        {% if site2 %}
-            <div class="row" style="gap: 8px; margin-bottom: 12px;">
-                <span class="pill success" style="font-size: 11px;">已連線</span>
+        <!-- Site 1 -->
+        <div class="card">
+            <div class="row-between">
+                <div>
+                    <div style="font-weight: 600;">{{ site_labels.site1 }}</div>
+                    <div class="subtle" style="font-size: 12px; margin-top: 2px;">Site 1 · 已登入</div>
+                </div>
+                <form method="post" action="/sync-prefs/site1/toggle" style="margin: 0;">
+                    <input type="hidden" name="period" value="{{ period }}">
+                    <label class="switch" title="切換同步">
+                        <input type="checkbox" onchange="this.form.submit()" {% if user.sync_site1 %}checked{% endif %}>
+                        <span class="slider"></span>
+                    </label>
+                </form>
             </div>
-            <p class="mono" style="font-size: 13px; word-break: break-all;">{{ site2.email }}</p>
-            <p class="subtle" style="font-size: 11px; margin-top: 4px;">
-                Token 到期：{{ site2.id_token_valid_until.strftime('%H:%M') }}（UTC，會自動續期）
-            </p>
-            <form method="post" action="/site2/revoke" style="margin-top: 16px;">
+        </div>
+
+        <!-- Site 2 -->
+        <div class="card">
+            <div class="row-between">
+                <div>
+                    <div style="font-weight: 600;">{{ site_labels.site2 }}</div>
+                    <div class="subtle" style="font-size: 12px; margin-top: 2px;">
+                        Site 2 · {% if site2_connected %}已連線{% else %}尚未連線{% endif %}
+                    </div>
+                </div>
+                <form method="post" action="/sync-prefs/site2/toggle" style="margin: 0;">
+                    <input type="hidden" name="period" value="{{ period }}">
+                    <label class="switch">
+                        <input type="checkbox" onchange="this.form.submit()" {% if user.sync_site2 %}checked{% endif %}>
+                        <span class="slider"></span>
+                    </label>
+                </form>
+            </div>
+
+            {% if site2_connected %}
+            <p class="mono" style="margin-top: 12px; font-size: 13px; word-break: break-all;">{{ site2.email }}</p>
+            <form method="post" action="/site2/revoke" style="margin-top: 12px;">
                 <input type="hidden" name="period" value="{{ period }}">
-                <button type="submit" class="btn danger" style="width: 100%; justify-content: center;">中斷連線</button>
+                <button type="submit" class="btn danger" style="width: 100%; justify-content: center; font-size: 12px;">中斷連線</button>
             </form>
-        {% else %}
-            {% if site2_error %}
-            <p class="error" style="margin-bottom: 12px; font-size: 13px;">{{ site2_error }}</p>
+            {% else %}
+                {% if site2_error %}
+                <p class="error" style="margin-top: 12px; font-size: 12px;">{{ site2_error }}</p>
+                {% endif %}
+                <form method="post" action="/site2/connect" style="margin-top: 12px;">
+                    <input type="hidden" name="period" value="{{ period }}">
+                    <label for="s2_email" style="margin-top: 0;">Email</label>
+                    <input type="email" name="email" id="s2_email" required
+                           placeholder="{{ user.user_id | lower }}@mail.ntust.edu.tw">
+                    <label for="s2_password" style="margin-top: 10px;">密碼</label>
+                    <input type="password" name="password" id="s2_password" required>
+                    <label style="margin-top: 10px; display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--fg-muted);">
+                        <input type="checkbox" name="remember" value="1" checked style="width: auto;">
+                        記住我
+                    </label>
+                    <button type="submit" class="btn primary" style="margin-top: 14px; width: 100%; justify-content: center;">連線</button>
+                </form>
             {% endif %}
-            <form method="post" action="/site2/connect">
-                <input type="hidden" name="period" value="{{ period }}">
+        </div>
 
-                <label for="s2_email" style="margin-top: 4px;">Email</label>
-                <input type="email" name="email" id="s2_email" required autocomplete="username"
-                       placeholder="{{ user.user_id | lower }}@mail.ntust.edu.tw">
-
-                <label for="s2_password" style="margin-top: 14px;">密碼</label>
-                <input type="password" name="password" id="s2_password" required autocomplete="current-password">
-
-                <label style="margin-top: 14px; display: flex; align-items: center; gap: 6px; font-size: 12px;">
-                    <input type="checkbox" name="remember" value="1" checked style="width: auto;">
-                    記住我（加密存 refreshToken）
-                </label>
-
-                <button type="submit" class="btn primary" style="margin-top: 16px; width: 100%; justify-content: center;">連線</button>
-            </form>
-            <p class="subtle" style="margin-top: 14px; font-size: 11px; line-height: 1.5;">
-                未連線時 Site2 同步會被 skip。本站不會儲存你的密碼，只保留 Fernet 加密的 refresh token。
-            </p>
-        {% endif %}
+        <!-- Site 3 -->
+        <div class="card">
+            <div class="row-between">
+                <div>
+                    <div style="font-weight: 600;">{{ site_labels.site3 }}</div>
+                    <div class="subtle" style="font-size: 12px; margin-top: 2px;">Site 3 · 無需登入</div>
+                </div>
+                <form method="post" action="/sync-prefs/site3/toggle" style="margin: 0;">
+                    <input type="hidden" name="period" value="{{ period }}">
+                    <label class="switch">
+                        <input type="checkbox" onchange="this.form.submit()" {% if user.sync_site3 %}checked{% endif %}>
+                        <span class="slider"></span>
+                    </label>
+                </form>
+            </div>
+        </div>
     </aside>
 </div>
 {% endblock %}

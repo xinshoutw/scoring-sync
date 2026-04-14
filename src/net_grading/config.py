@@ -22,6 +22,14 @@ class Settings(BaseSettings):
         "AKfycbwQs_qm7GS-P3nshz4pgyjZ_XJslpl3BF_1t9UIKFYQRn49z8M_TIf36Qm0XRR79mi3Vw/exec"
     )
 
+    # UI 顯示用：三站對應的同學名稱
+    site1_label: str = "王敬愷的評分系統"
+    site2_label: str = "張銘元的評分系統"
+    site3_label: str = "劉國豪的評分系統"
+
+    # 分組：JSON array of arrays, e.g. [["B11315009","B11315010"],["B11315011"]]
+    student_groups: list[list[str]] = Field(default_factory=list)
+
     database_url: str = "sqlite+aiosqlite:///./net_grading.db"
 
     @property
@@ -32,3 +40,8 @@ class Settings(BaseSettings):
 @lru_cache
 def get_settings() -> Settings:
     return Settings()
+
+
+def site_label(site: str) -> str:
+    s = get_settings()
+    return {"site1": s.site1_label, "site2": s.site2_label, "site3": s.site3_label}.get(site, site)

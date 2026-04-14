@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from net_grading.auth.middleware import require_user
 from net_grading.auth.session import CurrentUser
+from net_grading.config import get_settings
 from net_grading.db.engine import get_session
 from net_grading.routes.templating import templates
 from net_grading.sync.pull import (
@@ -34,8 +35,19 @@ async def conflicts_page(
         }
         for r in rows
     ]
+    cfg = get_settings()
     return templates.TemplateResponse(
-        request, "conflicts.html", {"user": user, "items": items}
+        request,
+        "conflicts.html",
+        {
+            "user": user,
+            "items": items,
+            "site_labels": {
+                "site1": cfg.site1_label,
+                "site2": cfg.site2_label,
+                "site3": cfg.site3_label,
+            },
+        },
     )
 
 

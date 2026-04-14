@@ -22,7 +22,7 @@
         {% for side_key, side in [('site1', item.site1), ('site2', item.site2)] %}
         <div class="card-hi">
             <div class="row-between">
-                <strong>{{ side_key | capitalize }}</strong>
+                <strong>{{ site_labels[side_key] }}</strong>
                 <span class="mono" style="font-weight: 700;">
                     {{ side.scores.topic + side.scores.content + side.scores.narrative + side.scores.presentation + side.scores.teamwork }}<span class="subtle"> / 100</span>
                 </span>
@@ -38,7 +38,7 @@
             {% endif %}
             <form method="post" action="/conflicts/{{ item.id }}/resolve" style="margin-top: 14px;">
                 <input type="hidden" name="choice" value="{{ side_key }}">
-                <button type="submit" class="btn primary" style="width: 100%; justify-content: center;">採用 {{ side_key | capitalize }} 版本</button>
+                <button type="submit" class="btn primary" style="width: 100%; justify-content: center;">採用此版本</button>
             </form>
         </div>
         {% endfor %}

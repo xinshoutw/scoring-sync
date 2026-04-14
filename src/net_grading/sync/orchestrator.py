@@ -50,8 +50,12 @@ async def sync_one_submission(
     grader_name: str,
     submission: Submission,
     target_name: str,
-    sites: tuple[SiteName, ...] = ("site1", "site2", "site3"),
+    sites: tuple[SiteName, ...] | None = None,
 ) -> SyncOutcome:
+    """sites=None 時自動採用 user.enabled_sites()（respect 使用者同步偏好）."""
+    if sites is None:
+        sites = user.enabled_sites()  # type: ignore[assignment]
+
     scores = ScoreCard(
         topic=submission.score_topic,
         content=submission.score_content,

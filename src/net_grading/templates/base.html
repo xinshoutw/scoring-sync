@@ -22,28 +22,32 @@
             --fg:          #e8eaf0;
             --fg-muted:    #8b93a7;
             --fg-subtle:   #5d6578;
-            --accent:      #7a8bff;
-            --accent-hi:   #9aa7ff;
+            --accent:      #7aa2ff;
+            --accent-hi:   #a5bfff;
+            --accent-glow: rgba(122, 162, 255, 0.16);
             --success:     #4ade80;
             --warning:     #fbbf24;
             --danger:      #f87171;
-            --self-bg:     rgba(122, 139, 255, 0.07);
+            --self-bg:     rgba(122, 162, 255, 0.08);
+            --grad-hero:   linear-gradient(135deg, #7aa2ff 0%, #60d394 45%, #fbbf24 100%);
         }
         html.light {
-            --bg:          #fafbfc;
+            --bg:          #f6f8fb;
             --surface:     #ffffff;
             --surface-hi:  #ffffff;
-            --border:      #e4e7ec;
-            --border-hi:   #cdd3dc;
+            --border:      #e1e6ed;
+            --border-hi:   #c7cfdc;
             --fg:          #0f1419;
             --fg-muted:    #5a6474;
             --fg-subtle:   #8a94a3;
-            --accent:      #4c5fd7;
-            --accent-hi:   #3a4cc2;
+            --accent:      #3a57d9;
+            --accent-hi:   #2b44be;
+            --accent-glow: rgba(58, 87, 217, 0.14);
             --success:     #16a34a;
             --warning:     #d97706;
             --danger:      #dc2626;
-            --self-bg:     rgba(76, 95, 215, 0.06);
+            --self-bg:     rgba(58, 87, 217, 0.06);
+            --grad-hero:   linear-gradient(135deg, #3a57d9 0%, #0c9488 45%, #d97706 100%);
         }
 
         /* ── Base ─────────────────────────────────────────── */
@@ -134,7 +138,7 @@
         input:focus, textarea:focus, select:focus {
             outline: none;
             border-color: var(--accent);
-            box-shadow: 0 0 0 3px rgba(122, 139, 255, 0.12);
+            box-shadow: 0 0 0 3px var(--accent-glow);
         }
         label { display: block; font-size: 13px; color: var(--fg-muted); margin-bottom: 6px; }
         textarea { resize: vertical; font-family: inherit; min-height: 64px; }
@@ -168,6 +172,74 @@
             color: var(--danger);
         }
         .btn.danger:hover { background: rgba(248, 113, 113, 0.1); }
+
+        /* ── Logo + 其他亮點元素 ─────────────────────────── */
+        .logo-wrap {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            text-decoration: none;
+            color: var(--fg);
+        }
+        .logo-mark {
+            width: 28px;
+            height: 28px;
+            display: inline-block;
+            background: var(--grad-hero);
+            border-radius: 8px;
+            position: relative;
+            box-shadow: 0 0 20px var(--accent-glow);
+        }
+        .logo-mark::after {
+            content: "";
+            position: absolute;
+            inset: 2px;
+            background: var(--surface);
+            border-radius: 6px;
+        }
+        .logo-mark svg {
+            position: absolute;
+            inset: 0;
+            z-index: 1;
+        }
+        .logo-text { font-weight: 700; letter-spacing: -0.01em; font-size: 16px; }
+        .accent-gradient-text {
+            background: var(--grad-hero);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+        }
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 36px;
+            height: 20px;
+        }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .switch .slider {
+            position: absolute;
+            cursor: pointer;
+            inset: 0;
+            background: var(--border-hi);
+            border-radius: 999px;
+            transition: background 150ms;
+        }
+        .switch .slider::before {
+            position: absolute;
+            content: "";
+            height: 14px;
+            width: 14px;
+            left: 3px;
+            top: 3px;
+            background: var(--fg);
+            border-radius: 50%;
+            transition: transform 150ms;
+        }
+        .switch input:checked + .slider { background: var(--accent); }
+        .switch input:checked + .slider::before {
+            transform: translateX(16px);
+            background: #fff;
+        }
 
         /* ── Pills ────────────────────────────────────────── */
         .pill {
@@ -250,12 +322,25 @@
 <body>
     {% if user %}
     <header class="top">
-        <div class="brand">net-grading</div>
+        <a href="/dashboard" class="logo-wrap">
+            <span class="logo-mark">
+                <svg width="28" height="28" viewBox="0 0 28 28">
+                    <path d="M8 14.5 L12 18 L20 10" fill="none" stroke="url(#g1)" stroke-width="2.4"
+                          stroke-linecap="round" stroke-linejoin="round"/>
+                    <defs>
+                        <linearGradient id="g1" x1="0" y1="0" x2="1" y2="1">
+                            <stop offset="0%" stop-color="#7aa2ff"/>
+                            <stop offset="60%" stop-color="#60d394"/>
+                            <stop offset="100%" stop-color="#fbbf24"/>
+                        </linearGradient>
+                    </defs>
+                </svg>
+            </span>
+            <span class="logo-text">評分系統</span>
+        </a>
         <nav>
             <span class="user-info">{{ user.user_id }} · {{ user.name }}</span>
-            <button type="button" class="btn" onclick="toggleTheme()" title="切換主題">
-                <span class="theme-icon-dark">●</span>
-            </button>
+            <button type="button" class="btn" onclick="toggleTheme()" title="切換主題">主題</button>
             <form method="post" action="/logout" style="margin:0">
                 <button type="submit" class="btn">登出</button>
             </form>
