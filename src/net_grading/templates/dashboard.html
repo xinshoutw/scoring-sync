@@ -1,12 +1,62 @@
 {% extends "base.html" %}
 {% block title %}Dashboard · net-grading{% endblock %}
 {% block content %}
-<h1>Hi, {{ user.name }}</h1>
-<p class="muted">{{ user.user_id }} · {{ user.class_name }}</p>
-<p style="margin-top: 32px;">
-    Session 到期時間：{{ user.expires_at.strftime('%Y-%m-%d %H:%M') }} UTC
+<h1>{{ period_label }}</h1>
+<p class="muted">{{ user.name }}（{{ user.class_name }}） · {{ user.user_id }}</p>
+
+<nav style="margin-top: 24px; display: flex; gap: 8px;">
+    {% for p in periods %}
+    <a href="/dashboard?period={{ p.code }}"
+       style="padding: 6px 16px; border-radius: 6px; border: 1px solid var(--border);
+              background: {% if p.code == period %}var(--accent); color: #fff{% else %}transparent{% endif %};
+              {% if not p.is_open %}opacity: 0.5; pointer-events: none;{% endif %}">
+        {{ p.label }}{% if not p.is_open %}（未開放）{% endif %}
+    </a>
+    {% endfor %}
+</nav>
+
+{% if reload_error %}
+<p class="error" style="margin-top: 16px;">Site1 重整失敗：{{ reload_error }}（顯示的是本地快取）</p>
+{% endif %}
+
+<p class="muted" style="margin-top: 24px;">
+    {{ targets | length }} 位待評 · 已評 {{ evaluated_count }} · 未評 {{ targets | length - evaluated_count }}
 </p>
-<p class="muted" style="margin-top: 16px;">
-    Dashboard 的完整功能（目標列表 / 同步狀態 / 衝突提示）將在 M3–M7 逐步實作。
-</p>
+
+<table style="width: 100%; margin-top: 16px; border-collapse: collapse;">
+    <thead>
+        <tr style="border-bottom: 1px solid var(--border); text-align: left;">
+            <th style="padding: 8px 0;">學號</th>
+            <th>姓名</th>
+            <th>班級</th>
+            <th style="text-align: right;">本地總分</th>
+            <th style="text-align: right;">最近送出</th>
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+    {% for t in targets %}
+        <tr style="border-bottom: 1px solid var(--border); {% if t.is_self %}background: rgba(138,157,255,0.08);{% endif %}">
+            <td style="padding: 12px 0; font-family: ui-monospace, monospace;">{{ t.student_id }}</td>
+            <td>{{ t.name }}{% if t.is_self %} <span class="muted">（自評）</span>{% endif %}</td>
+            <td class="muted">{{ t.class_name }}</td>
+            <td style="text-align: right; font-family: ui-monospace, monospace;">
+                {% if t.local_total is not none %}
+                    {{ t.local_total }}/100
+                {% else %}
+                    <span class="muted">—</span>
+                {% endif %}
+            </td>
+            <td style="text-align: right; font-family: ui-monospace, monospace;" class="muted">
+                {{ t.local_submitted_at.strftime('%m-%d %H:%M') if t.local_submitted_at else '—' }}
+            </td>
+            <td style="text-align: right;">
+                <a href="/grade/{{ period }}/{{ t.student_id }}">
+                    {% if t.local_total is not none %}編輯{% else %}評分{% endif %} →
+                </a>
+            </td>
+        </tr>
+    {% endfor %}
+    </tbody>
+</table>
 {% endblock %}

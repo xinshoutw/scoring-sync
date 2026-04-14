@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% block title %}評分 {{ target.name }} · net-grading{% endblock %}
+{% block content %}
+<p><a href="/dashboard?period={{ period }}" class="muted">← 返回列表</a></p>
+
+<h1 style="margin-bottom: 4px;">
+    {{ target.name }}
+    <span style="font-size: 16px; color: var(--muted); font-weight: 400;">
+        {{ target.student_id }} · {{ target.class_name }}{% if target.is_self %} · 自評{% endif %}
+    </span>
+</h1>
+<p class="muted" style="margin-top: 8px;">
+    提示：<kbd>Tab</kbd> 切換欄位 · <kbd>↑</kbd>/<kbd>↓</kbd> 加減分 · <kbd>Enter</kbd> 送出
+</p>
+
+{% if error %}<p class="error" style="margin-top: 16px;">{{ error }}</p>{% endif %}
+{% if saved_id %}<p style="margin-top: 16px; padding: 10px 14px; border: 1px solid var(--accent); border-radius: 6px;">
+    已本地儲存（submission id = {{ saved_id }}）。M5 會接上三站同步。
+</p>{% endif %}
+
+<form method="post" action="/grade/{{ period }}/{{ target.student_id }}" style="margin-top: 24px; max-width: 640px;">
+    {% with field='topic', label='主題掌握', max=30, value=scores.topic %}
+    {% include "components/score_input.html" %}
+    {% endwith %}
+    {% with field='content', label='內容豐富度', max=30, value=scores.content %}
+    {% include "components/score_input.html" %}
+    {% endwith %}
+    {% with field='narrative', label='敘述技巧', max=20, value=scores.narrative %}
+    {% include "components/score_input.html" %}
+    {% endwith %}
+    {% with field='presentation', label='表現能力', max=10, value=scores.presentation %}
+    {% include "components/score_input.html" %}
+    {% endwith %}
+    {% with field='teamwork', label='團隊合作', max=10, value=scores.teamwork %}
+    {% include "components/score_input.html" %}
+    {% endwith %}
+
+    <div style="margin-top: 20px; display: flex; justify-content: space-between; align-items: baseline;">
+        <span class="muted">總分</span>
+        <span style="font: 600 28px ui-monospace, monospace;">
+            <span id="total" data-max="100">0</span> / 100
+        </span>
+    </div>
+
+    <div style="margin-top: 24px;">
+        <label for="comment" style="display: block; margin-bottom: 8px;">評語（選填，同步到其他站）</label>
+        <textarea id="comment" name="comment" rows="3"
+                  style="width: 100%; box-sizing: border-box; background: transparent; color: var(--fg);
+                         border: 1px solid var(--border); border-radius: 6px; padding: 10px; font: inherit;">{{ comment | default('') }}</textarea>
+    </div>
+
+    <div style="margin-top: 16px;">
+        <label for="self_note" style="display: block; margin-bottom: 8px;">自備備註（選填，僅本地 + Site1）</label>
+        <textarea id="self_note" name="self_note" rows="2"
+                  style="width: 100%; box-sizing: border-box; background: transparent; color: var(--fg);
+                         border: 1px solid var(--border); border-radius: 6px; padding: 10px; font: inherit;">{{ self_note | default('') }}</textarea>
+    </div>
+
+    <button type="submit" class="primary" style="margin-top: 24px;">送出（僅本地；M5 接上同步）</button>
+</form>
+
+{% if history %}
+<details style="margin-top: 40px;">
+    <summary style="cursor: pointer; color: var(--muted);">歷史紀錄（{{ history | length }} 筆）</summary>
+    <table style="width: 100%; margin-top: 12px; border-collapse: collapse; font-size: 14px;">
+        <thead>
+            <tr style="border-bottom: 1px solid var(--border); text-align: left;">
+                <th style="padding: 8px 0;">時間</th>
+                <th>來源</th>
+                <th style="text-align: right;">總分</th>
+                <th>評語</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for h in history %}
+            <tr style="border-bottom: 1px solid var(--border);">
+                <td style="padding: 8px 0; font-family: ui-monospace, monospace;">{{ h.submitted_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                <td><code>{{ h.source }}</code></td>
+                <td style="text-align: right; font-family: ui-monospace, monospace;">{{ h.total }}</td>
+                <td class="muted">{{ h.comment[:40] }}{% if h.comment|length > 40 %}…{% endif %}</td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</details>
+{% endif %}
+
+<script src="{{ url_for('static', path='js/grade.js') }}" defer></script>
+{% endblock %}
