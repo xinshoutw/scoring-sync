@@ -241,6 +241,40 @@
             background: #fff;
         }
 
+        /* ── Reconnect banner ─────────────────────────────── */
+        #reconnect-banner {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 1000;
+            padding: 10px 16px;
+            background: var(--warning);
+            color: #0b0d12;
+            font-size: 13px;
+            font-weight: 600;
+            text-align: center;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.3);
+            transform: translateY(-100%);
+            transition: transform 200ms ease-out;
+        }
+        #reconnect-banner.visible {
+            transform: translateY(0);
+        }
+        #reconnect-banner .dot {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #0b0d12;
+            margin-right: 8px;
+            animation: pulse 1.2s ease-in-out infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50%      { opacity: 0.4; transform: scale(0.7); }
+        }
+
         /* ── Pills ────────────────────────────────────────── */
         .pill {
             display: inline-flex;
@@ -320,6 +354,9 @@
     </style>
 </head>
 <body>
+    <div id="reconnect-banner" role="status" aria-live="polite">
+        <span class="dot"></span><span id="reconnect-text">連線中斷，正在重新連線…</span>
+    </div>
     {% if user %}
     <header class="top">
         <a href="/dashboard" class="logo-wrap">
@@ -357,6 +394,44 @@
             document.documentElement.className = next;
             localStorage.setItem('theme', next);
         }
+
+        // ── Heartbeat：每 3 秒 ping /heartbeat；斷線顯示 banner、恢復後 server id 變更則 reload ──
+        (function () {
+            var banner = document.getElementById('reconnect-banner');
+            var textEl = document.getElementById('reconnect-text');
+            var initialId = null;
+            var wasDown = false;
+
+            async function ping() {
+                try {
+                    var r = await fetch('/heartbeat', { cache: 'no-store', credentials: 'same-origin' });
+                    if (!r.ok) throw new Error('bad_status_' + r.status);
+                    var d = await r.json();
+                    if (initialId === null) {
+                        initialId = d.id;
+                    } else if (d.id !== initialId) {
+                        // 伺服器已重啟且目前連線新版 → 直接 reload 取最新資料
+                        textEl.textContent = '伺服器已更新，重新載入頁面…';
+                        setTimeout(function () { window.location.reload(); }, 400);
+                        return;
+                    }
+                    if (wasDown) {
+                        textEl.textContent = '已重新連線';
+                        setTimeout(function () { banner.classList.remove('visible'); }, 600);
+                        wasDown = false;
+                    }
+                } catch (e) {
+                    wasDown = true;
+                    textEl.textContent = '連線中斷，正在重新連線…';
+                    banner.classList.add('visible');
+                }
+            }
+
+            ping();
+            setInterval(ping, 3000);
+            // 視窗重新取得焦點時立刻檢查（分頁切回來不用等下一個 tick）
+            window.addEventListener('focus', ping);
+        })();
     </script>
     {% block scripts %}{% endblock %}
 </body>

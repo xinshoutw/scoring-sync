@@ -1,3 +1,4 @@
+import secrets
 from contextlib import asynccontextmanager
 from collections.abc import AsyncIterator
 from pathlib import Path
@@ -14,6 +15,9 @@ from net_grading.routes import grading as grading_routes
 from net_grading.routes import settings as settings_routes
 
 _STATIC_DIR = Path(__file__).parent / "static"
+
+# 進程啟動唯一 id；瀏覽器 heartbeat 比對 → 偵測重啟
+SERVER_INSTANCE_ID = secrets.token_hex(8)
 
 
 @asynccontextmanager
@@ -42,6 +46,12 @@ def create_app() -> FastAPI:
     @app.get("/health")
     async def health() -> JSONResponse:
         return JSONResponse({"status": "ok", "env": settings.app_env})
+
+    @app.get("/heartbeat")
+    async def heartbeat() -> JSONResponse:
+        resp = JSONResponse({"id": SERVER_INSTANCE_ID})
+        resp.headers["cache-control"] = "no-store, no-cache, must-revalidate"
+        return resp
 
     return app
 
