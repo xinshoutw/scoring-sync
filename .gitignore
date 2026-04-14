@@ -849,3 +849,6 @@ FodyWeavers.xsd
 # Additional files built by Visual Studio
 
 # End of https://www.toptal.com/developers/gitignore/api/python,intellij,macos,linux,windows,visualstudio,visualstudiocode,pycharm
+# 含敏感憑證的 PoC 筆記，永遠不得入庫
+Endpoints-PoC.md
+Endpoints-PoC*
