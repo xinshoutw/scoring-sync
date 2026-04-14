@@ -30,6 +30,7 @@
             --warning:     #fbbf24;
             --danger:      #f87171;
             --self-bg:     rgba(122, 162, 255, 0.08);
+            --skipped-bg:  rgba(251, 191, 36, 0.12);
             --grad-hero:   linear-gradient(135deg, #7aa2ff 0%, #60d394 45%, #fbbf24 100%);
         }
         html.light {
@@ -48,6 +49,7 @@
             --warning:     #d97706;
             --danger:      #dc2626;
             --self-bg:     rgba(58, 87, 217, 0.06);
+            --skipped-bg:  rgba(217, 119, 6, 0.10);
             --grad-hero:   linear-gradient(135deg, #3a57d9 0%, #0c9488 45%, #d97706 100%);
         }
 
@@ -294,18 +296,6 @@
         .pill.pending { border-color: var(--warning); color: var(--warning); }
         .pill.skipped { border-color: var(--border);  color: var(--fg-subtle); }
 
-        .tag-warn {
-            display: inline-flex;
-            align-items: center;
-            gap: 4px;
-            padding: 1px 8px;
-            border-radius: 999px;
-            border: 1px solid var(--warning);
-            color: var(--warning);
-            font-size: 11px;
-            margin-left: 6px;
-            white-space: nowrap;
-        }
 
         /* ── Errors / banners ─────────────────────────────── */
         .error {
@@ -334,6 +324,9 @@
         td { padding: 14px 8px; }
         tr.is-self { background: var(--self-bg); }
         tr.is-self:hover { background: var(--self-bg); filter: brightness(1.2); }
+        /* 放在 is-self 之後：同時帶兩個 class 時以 skipped 為主（更需注意）*/
+        tr.is-skipped { background: var(--skipped-bg); }
+        tr.is-skipped:hover { background: var(--skipped-bg); filter: brightness(1.15); }
 
         /* ── Period tabs ──────────────────────────────────── */
         .tabs {
