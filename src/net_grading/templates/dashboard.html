@@ -137,9 +137,9 @@
                     <input type="hidden" name="period" value="{{ period }}">
                     <label for="s2_email" style="margin-top: 0;">Email</label>
                     <input type="email" name="email" id="s2_email" required
-                           placeholder="{{ user.user_id | lower }}@mail.ntust.edu.tw">
+                           value="{{ user.user_id | lower }}@mail.ntust.edu.tw">
                     <label for="s2_password" style="margin-top: 10px;">密碼</label>
-                    <input type="password" name="password" id="s2_password" required>
+                    <input type="password" name="password" id="s2_password" required autofocus>
                     <label style="margin-top: 10px; display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--fg-muted);">
                         <input type="checkbox" name="remember" value="1" checked style="width: auto;">
                         記住我
