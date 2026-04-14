@@ -1,12 +1,14 @@
-"""Site2 (ntust-grading / Firebase) client。
+"""Site2 (ntust-grading, stanleyowen/ntust-grading) Firebase client。
 
-Auth：POST identitytoolkit.googleapis.com/v1/accounts:signInWithPassword
-Refresh：POST securetoken.googleapis.com/v1/token  grant_type=refresh_token
-Write：POST firestore.googleapis.com/v1/projects/{project}/databases/(default)/documents/grades
-       with body {"fields": {...}} （新建 doc；對齊 Site1 append-only 語意）
+Schema（對齊其 src/lib/types.ts `GradeSubmission`）：
+    stage, graderId, graderName, targetId, targetName,
+    scores: {topicMastery, contentRichness, narrativeSkill, presentationSkill, teamwork},
+    total, comment, submittedAt
 
-> Firestore grades 集合的實際欄位命名（`score_topic` vs `scoreTopic` 等）在 spec #9
-> 列為開放問題。本檔採 snake_case 並開 override hook，必要時實作端直接調。
+Security rule：grades.create 需 auth + isStageOpen(request.resource.data.stage)；
+grades.read 只給 admin，因此 list_submissions 對學生會 403，呼叫端要容忍。
+
+寫入採 upsert：query existing（graderId+targetId+stage），有則 PATCH、無則 POST。
 """
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
@@ -23,7 +25,6 @@ from net_grading.sites.base import (
 )
 from net_grading.sites.errors import (
     SiteLoginError,
-    SiteNotSupported,
     SiteTokenExpired,
     SiteTransportError,
 )
@@ -51,22 +52,51 @@ class Site2RefreshResult:
     id_token_expires_at: datetime
 
 
-def _to_fs_value(v: Any) -> dict[str, Any]:
-    """Python → Firestore REST Value."""
-    if isinstance(v, bool):
-        return {"booleanValue": v}
-    if isinstance(v, int):
-        return {"integerValue": str(v)}
-    if isinstance(v, str):
-        return {"stringValue": v}
-    if isinstance(v, datetime):
-        iso = v.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-        return {"timestampValue": iso}
-    raise TypeError(f"unsupported type: {type(v)}")
+def _v_str(s: str) -> dict[str, Any]:
+    return {"stringValue": s}
 
 
-def _fs_fields(d: dict[str, Any]) -> dict[str, Any]:
-    return {"fields": {k: _to_fs_value(v) for k, v in d.items()}}
+def _v_int(n: int) -> dict[str, Any]:
+    return {"integerValue": str(n)}
+
+
+def _v_ts(dt: datetime) -> dict[str, Any]:
+    iso = dt.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    return {"timestampValue": iso}
+
+
+def _v_map(d: dict[str, Any]) -> dict[str, Any]:
+    return {"mapValue": {"fields": d}}
+
+
+def _build_grade_fields(
+    stage: Period,
+    grader_id: str,
+    grader_name: str,
+    target_id: str,
+    target_name: str,
+    scores: ScoreCard,
+    comment: str,
+) -> dict[str, Any]:
+    return {
+        "stage": _v_str(stage),
+        "graderId": _v_str(grader_id),
+        "graderName": _v_str(grader_name),
+        "targetId": _v_str(target_id),
+        "targetName": _v_str(target_name),
+        "scores": _v_map(
+            {
+                "topicMastery": _v_int(scores.topic),
+                "contentRichness": _v_int(scores.content),
+                "narrativeSkill": _v_int(scores.narrative),
+                "presentationSkill": _v_int(scores.presentation),
+                "teamwork": _v_int(scores.teamwork),
+            }
+        ),
+        "total": _v_int(scores.total),
+        "comment": _v_str(comment),
+        "submittedAt": _v_ts(datetime.now(timezone.utc)),
+    }
 
 
 class Site2Client:
@@ -132,55 +162,14 @@ class Site2Client:
                 id_token_expires_at=datetime.now(timezone.utc) + timedelta(seconds=expires_in),
             )
 
-    async def submit(
+    async def _find_existing_grade_doc_id(
         self,
         id_token: str,
         grader_id: str,
-        period: Period,
         target_id: str,
-        scores: ScoreCard,
-        comment: str,
-    ) -> SubmitResult:
-        """新建一筆 grades document（append）。"""
-        fields = {
-            "graderId": grader_id,
-            "targetId": target_id,
-            "period": period,
-            "score_topic": scores.topic,
-            "score_content": scores.content,
-            "score_narrative": scores.narrative,
-            "score_presentation": scores.presentation,
-            "score_teamwork": scores.teamwork,
-            "total": scores.total,
-            "comment": comment,
-            "submittedAt": datetime.now(timezone.utc),
-        }
-        url = (
-            f"{FIRESTORE_BASE}/v1/projects/{self._project}/databases/(default)/documents/grades"
-        )
-        async with self._client() as c:
-            try:
-                r = await c.post(
-                    url,
-                    headers={"authorization": f"Bearer {id_token}"},
-                    json=_fs_fields(fields),
-                )
-            except httpx.HTTPError as exc:
-                raise SiteTransportError(str(exc)) from exc
-            if r.status_code == 401:
-                raise SiteTokenExpired("id_token_expired")
-            if r.status_code >= 400:
-                raise SiteTransportError(
-                    f"firestore_write_failed_{r.status_code}:{r.text[:200]}"
-                )
-            body = r.json()
-            doc_name = body.get("name", "")
-            return SubmitResult(external_id=doc_name, raw_response=r.text[:4000])
-
-    async def list_submissions(
-        self, id_token: str, grader_id: str, period: Period
-    ) -> list[SubmissionSnapshot]:
-        """以 structuredQuery 拉該 grader 該期別的全部紀錄；同一 target 取最新一筆."""
+        stage: Period,
+    ) -> str | None:
+        """查既有 grades doc；成功回 doc id；rule 可能擋讀，讀失敗就當作無."""
         url = (
             f"{FIRESTORE_BASE}/v1/projects/{self._project}"
             f"/databases/(default)/documents:runQuery"
@@ -192,33 +181,118 @@ class Site2Client:
                     "compositeFilter": {
                         "op": "AND",
                         "filters": [
-                            {
-                                "fieldFilter": {
-                                    "field": {"fieldPath": "graderId"},
-                                    "op": "EQUAL",
-                                    "value": {"stringValue": grader_id},
-                                }
-                            },
-                            {
-                                "fieldFilter": {
-                                    "field": {"fieldPath": "period"},
-                                    "op": "EQUAL",
-                                    "value": {"stringValue": period},
-                                }
-                            },
+                            {"fieldFilter": {"field": {"fieldPath": "graderId"}, "op": "EQUAL", "value": _v_str(grader_id)}},
+                            {"fieldFilter": {"field": {"fieldPath": "targetId"}, "op": "EQUAL", "value": _v_str(target_id)}},
+                            {"fieldFilter": {"field": {"fieldPath": "stage"}, "op": "EQUAL", "value": _v_str(stage)}},
+                        ],
+                    }
+                },
+                "limit": 1,
+            }
+        }
+        async with self._client() as c:
+            r = await c.post(url, headers={"authorization": f"Bearer {id_token}"}, json=query)
+            if r.status_code != 200:
+                return None  # 權限被擋或其他錯誤 → 當作沒有現有紀錄，走 create
+            rows = r.json()
+            for row in rows:
+                doc = row.get("document")
+                if doc:
+                    name = doc.get("name", "")
+                    return name.rsplit("/", 1)[-1] if name else None
+            return None
+
+    async def submit(
+        self,
+        id_token: str,
+        grader_id: str,
+        grader_name: str,
+        period: Period,
+        target_id: str,
+        target_name: str,
+        scores: ScoreCard,
+        comment: str,
+    ) -> SubmitResult:
+        fields = _build_grade_fields(
+            period, grader_id, grader_name, target_id, target_name, scores, comment
+        )
+
+        existing_id = await self._find_existing_grade_doc_id(
+            id_token, grader_id, target_id, period
+        )
+
+        async with self._client() as c:
+            if existing_id:
+                # PATCH：覆寫指定欄位
+                url = (
+                    f"{FIRESTORE_BASE}/v1/projects/{self._project}"
+                    f"/databases/(default)/documents/grades/{existing_id}"
+                )
+                params = [
+                    ("updateMask.fieldPaths", k) for k in fields.keys()
+                ]
+                try:
+                    r = await c.patch(
+                        url,
+                        headers={"authorization": f"Bearer {id_token}"},
+                        params=params,
+                        json={"fields": fields},
+                    )
+                except httpx.HTTPError as exc:
+                    raise SiteTransportError(str(exc)) from exc
+            else:
+                # 新建
+                url = (
+                    f"{FIRESTORE_BASE}/v1/projects/{self._project}"
+                    f"/databases/(default)/documents/grades"
+                )
+                try:
+                    r = await c.post(
+                        url,
+                        headers={"authorization": f"Bearer {id_token}"},
+                        json={"fields": fields},
+                    )
+                except httpx.HTTPError as exc:
+                    raise SiteTransportError(str(exc)) from exc
+
+            if r.status_code == 401:
+                raise SiteTokenExpired("id_token_expired")
+            if r.status_code >= 400:
+                raise SiteTransportError(
+                    f"firestore_write_failed_{r.status_code}:{r.text[:300]}"
+                )
+            body = r.json()
+            doc_name = body.get("name", existing_id or "")
+            return SubmitResult(external_id=doc_name, raw_response=r.text[:4000])
+
+    async def list_submissions(
+        self, id_token: str, grader_id: str, period: Period
+    ) -> list[SubmissionSnapshot]:
+        """Site2 security rule 只允許 admin read grades；學生會拿 403 空集合。"""
+        url = (
+            f"{FIRESTORE_BASE}/v1/projects/{self._project}"
+            f"/databases/(default)/documents:runQuery"
+        )
+        query = {
+            "structuredQuery": {
+                "from": [{"collectionId": "grades"}],
+                "where": {
+                    "compositeFilter": {
+                        "op": "AND",
+                        "filters": [
+                            {"fieldFilter": {"field": {"fieldPath": "graderId"}, "op": "EQUAL", "value": _v_str(grader_id)}},
+                            {"fieldFilter": {"field": {"fieldPath": "stage"}, "op": "EQUAL", "value": _v_str(period)}},
                         ],
                     }
                 },
             }
         }
         async with self._client() as c:
-            r = await c.post(
-                url,
-                headers={"authorization": f"Bearer {id_token}"},
-                json=query,
-            )
+            r = await c.post(url, headers={"authorization": f"Bearer {id_token}"}, json=query)
             if r.status_code == 401:
                 raise SiteTokenExpired("id_token_expired")
+            if r.status_code in (403, 404):
+                return []  # 被 security rule 擋 → 視同沒有資料
             if r.status_code >= 400:
                 raise SiteTransportError(
                     f"firestore_query_failed_{r.status_code}:{r.text[:200]}"
@@ -229,8 +303,7 @@ class Site2Client:
                 doc = row.get("document")
                 if not doc:
                     continue
-                f = doc.get("fields", {})
-                snap = _doc_to_snapshot(doc.get("name", ""), f, period)
+                snap = _doc_to_snapshot(doc.get("name", ""), doc.get("fields", {}), period)
                 if snap is None:
                     continue
                 prev = latest.get(snap.target_student_id)
@@ -239,28 +312,24 @@ class Site2Client:
             return list(latest.values())
 
 
-def _doc_to_snapshot(name: str, fields: dict, period: Period) -> SubmissionSnapshot | None:
-    def _as_int(key: str) -> int:
-        v = fields.get(key)
-        if not v:
-            return 0
-        return int(v.get("integerValue", 0))
-
+def _doc_to_snapshot(
+    name: str, fields: dict[str, Any], period: Period
+) -> SubmissionSnapshot | None:
     def _as_str(key: str) -> str:
-        v = fields.get(key)
-        if not v:
-            return ""
-        return v.get("stringValue", "")
+        return fields.get(key, {}).get("stringValue", "")
 
     def _as_ts(key: str) -> datetime:
-        v = fields.get(key)
-        if not v:
-            return datetime.now(timezone.utc)
-        raw = v.get("timestampValue", "")
+        raw = fields.get(key, {}).get("timestampValue", "")
         try:
             return datetime.fromisoformat(raw.replace("Z", "+00:00"))
         except ValueError:
             return datetime.now(timezone.utc)
+
+    scores_map = fields.get("scores", {}).get("mapValue", {}).get("fields", {})
+
+    def _score(k: str) -> int:
+        v = scores_map.get(k, {})
+        return int(v.get("integerValue", 0))
 
     target = _as_str("targetId")
     if not target:
@@ -269,11 +338,11 @@ def _doc_to_snapshot(name: str, fields: dict, period: Period) -> SubmissionSnaps
         target_student_id=target,
         period=period,
         scores=ScoreCard(
-            topic=_as_int("score_topic"),
-            content=_as_int("score_content"),
-            narrative=_as_int("score_narrative"),
-            presentation=_as_int("score_presentation"),
-            teamwork=_as_int("score_teamwork"),
+            topic=_score("topicMastery"),
+            content=_score("contentRichness"),
+            narrative=_score("narrativeSkill"),
+            presentation=_score("presentationSkill"),
+            teamwork=_score("teamwork"),
         ),
         comment=_as_str("comment"),
         self_note="",

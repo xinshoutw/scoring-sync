@@ -72,7 +72,7 @@ async def sync_one_submission(
             case "site2":
                 tasks.append(
                     asyncio.create_task(
-                        _do_site2(db, user, submission, scores)
+                        _do_site2(db, user, grader_name, submission, target_name, scores)
                     )
                 )
             case "site3":
@@ -131,7 +131,12 @@ async def _do_site1(
 
 
 async def _do_site2(
-    db: AsyncSession, user: CurrentUser, sub: Submission, scores: ScoreCard
+    db: AsyncSession,
+    user: CurrentUser,
+    grader_name: str,
+    sub: Submission,
+    target_name: str,
+    scores: ScoreCard,
 ) -> SiteResult:
     t0 = time.monotonic()
     id_token = await get_id_token(db, user.user_id)
@@ -148,11 +153,13 @@ async def _do_site2(
     try:
         result = await Site2Client().submit(
             id_token,
-            user.user_id,
-            sub.period,
-            sub.target_student_id,
-            scores,
-            sub.comment or "",
+            grader_id=user.user_id,
+            grader_name=grader_name,
+            period=sub.period,
+            target_id=sub.target_student_id,
+            target_name=target_name,
+            scores=scores,
+            comment=sub.comment or "",
         )
     except SiteTokenExpired as exc:
         return _fail("site2", t0, None, f"token_expired:{exc}", None)
