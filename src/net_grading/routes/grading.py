@@ -288,6 +288,19 @@ async def grade_submit(
         source="local",
     )
 
+    # 使用者手動重送 = 新權威版本，先前任何（skip/未決）import-phase 衝突都失效
+    from sqlalchemy import delete as _sa_delete
+    from net_grading.db.models import ConflictEvent
+
+    await db.execute(
+        _sa_delete(ConflictEvent).where(
+            ConflictEvent.user_id == user.user_id,
+            ConflictEvent.period == period,
+            ConflictEvent.target_student_id == target_id,
+        )
+    )
+    await db.commit()
+
     enabled = user.enabled_sites()
     # 預寫 pending 列：讓 redirect 後的 GET 立刻能顯示三顆 ⏳
     if enabled:
