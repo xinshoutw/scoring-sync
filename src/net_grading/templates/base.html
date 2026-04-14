@@ -38,6 +38,7 @@
         <div class="brand">net-grading</div>
         <nav>
             <span class="muted">{{ user.user_id }} · {{ user.name }}</span>
+            <a href="/settings">設定</a>
             <button type="button" onclick="toggleTheme()">主題</button>
             <form method="post" action="/logout" style="margin:0">
                 <button type="submit">登出</button>
