@@ -19,33 +19,34 @@
 {% if error %}<p class="error" style="margin-top: 16px;">{{ error }}</p>{% endif %}
 
 {% if sync_status %}
-{% set color_map = {'success': 'success', 'failed': 'failed', 'pending': 'pending', 'skipped': 'skipped'} %}
 {% set label_map = {'success': '✓', 'failed': '✗', 'pending': '⏳', 'skipped': '—'} %}
-<section class="card-hi" style="margin-top: 20px;">
+<section class="card-hi" style="margin-top: 20px;"
+         data-submission-id="{{ sync_submission_id }}"
+         data-live="{{ 1 if live else 0 }}">
     <h2 style="margin: 0 0 14px;">同步狀態</h2>
     <div class="stack" style="gap: 8px;">
         {% for site in ['site1', 'site2', 'site3'] %}
             {% set log = sync_status.get(site) %}
             {% if log %}
             {% set status = log.status %}
-            <div class="row-between">
+            <div class="row-between" id="sync-row-{{ site }}" data-site="{{ site }}">
                 <div class="row" style="gap: 10px;">
-                    <span class="pill {{ color_map.get(status, 'pending') }}">
+                    <span class="pill {{ status }}" id="pill-{{ site }}">
                         <strong>{{ label_map.get(status, '?') }}</strong>
                         {{ site_labels[site] }}
                     </span>
                 </div>
-                {% if status == 'failed' %}
-                <form method="post" action="/sync/{{ sync_submission_id }}/retry/{{ site }}" style="margin: 0;">
+                <form method="post" action="/sync/{{ sync_submission_id }}/retry/{{ site }}"
+                      style="margin: 0; display: {% if status == 'failed' %}inline-flex{% else %}none{% endif %};"
+                      id="retry-{{ site }}">
                     <button type="submit" class="btn" style="padding: 3px 10px; font-size: 12px;">重試</button>
                 </form>
-                {% endif %}
             </div>
-            {% if log.error_message and status == 'failed' %}
-            <p class="subtle" style="font-size: 12px; margin-left: 4px;">
-                {{ log.error_message[:240] }}
+            <p class="subtle" id="err-{{ site }}"
+               style="font-size: 12px; margin-left: 4px;
+                      display: {% if status == 'failed' and log.error_message %}block{% else %}none{% endif %};">
+                {{ log.error_message[:240] if log.error_message else '' }}
             </p>
-            {% endif %}
             {% endif %}
         {% endfor %}
     </div>
@@ -120,4 +121,49 @@
 
 {% block scripts %}
 <script src="{{ url_for('static', path='js/grade.js') }}" defer></script>
+<script>
+(function () {
+    var panel = document.querySelector('[data-submission-id]');
+    if (!panel || panel.dataset.live !== '1' || !window.EventSource) return;
+
+    var submissionId = panel.dataset.submissionId;
+    var icons = { success: '✓', failed: '✗', pending: '⏳', skipped: '—' };
+
+    function apply(site, data) {
+        var pill = document.getElementById('pill-' + site);
+        if (pill) {
+            pill.className = 'pill ' + data.status;
+            var strong = pill.querySelector('strong');
+            if (strong) strong.textContent = icons[data.status] || '?';
+        }
+        var retry = document.getElementById('retry-' + site);
+        if (retry) retry.style.display = data.status === 'failed' ? 'inline-flex' : 'none';
+        var err = document.getElementById('err-' + site);
+        if (err) {
+            if (data.status === 'failed' && data.error) {
+                err.textContent = String(data.error).slice(0, 240);
+                err.style.display = 'block';
+            } else {
+                err.style.display = 'none';
+            }
+        }
+    }
+
+    var es = new EventSource('/sync/' + submissionId + '/events');
+    ['site1', 'site2', 'site3'].forEach(function (site) {
+        es.addEventListener(site, function (e) {
+            try { apply(site, JSON.parse(e.data)); } catch (err) {}
+        });
+    });
+    es.addEventListener('done', function () {
+        es.close();
+        // 同步結束 → 拿掉 live 參數，讓 reload 的 URL 保持乾淨
+        var url = new URL(window.location.href);
+        url.searchParams.delete('live');
+        window.history.replaceState({}, '', url.toString());
+    });
+    es.addEventListener('ping', function () {});
+    es.onerror = function () { /* 讓瀏覽器自動重連 */ };
+})();
+</script>
 {% endblock %}

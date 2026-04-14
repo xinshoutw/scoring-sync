@@ -21,11 +21,18 @@ from net_grading.sync.local import (
     upsert_targets_cache,
 )
 from net_grading.sync.orchestrator import (
+    fire_and_forget,
     latest_logs_for_submission,
+    preinsert_pending,
+    run_sync_background,
     sync_one_submission,
 )
 from net_grading.sync.pull import initial_import, pending_conflicts_count
 from sqlalchemy import select
+import asyncio
+import json
+from sse_starlette.sse import EventSourceResponse
+from net_grading.sync.sse import bus, is_sentinel
 
 
 router = APIRouter()
@@ -142,6 +149,7 @@ async def grade_form(
     user: CurrentUser = Depends(require_user),
     db: AsyncSession = Depends(get_session),
     saved_id: int | None = Query(None),
+    live: int = Query(0),
 ) -> Response:
     if period not in ("midterm", "final"):
         raise HTTPException(status_code=400, detail="invalid_period")
@@ -189,6 +197,7 @@ async def grade_form(
             "saved_id": saved_id,
             "sync_submission_id": sync_of_submission_id,
             "sync_status": sync_status,
+            "live": bool(live),
             "site_labels": {
                 "site1": cfg.site1_label,
                 "site2": cfg.site2_label,
@@ -245,17 +254,26 @@ async def grade_submit(
         source="local",
     )
 
-    # 阻塞並行送出三站（~2-3 秒）
-    await sync_one_submission(
-        db,
-        user,
-        grader_name=user.name,
-        submission=saved,
-        target_name=target_row.name,
+    enabled = user.enabled_sites()
+    # 預寫 pending 列：讓 redirect 後的 GET 立刻能顯示三顆 ⏳
+    if enabled:
+        await preinsert_pending(db, saved.id, enabled)
+
+    # Fire-and-forget；新 session 在 task 內開。保 reference 免 GC。
+    fire_and_forget(
+        run_sync_background(
+            submission_id=saved.id,
+            grader_id=user.user_id,
+            grader_name=user.name,
+            site1_sid=user.site1_sid,
+            target_name=target_row.name,
+            sites=enabled,
+        )
     )
 
     return RedirectResponse(
-        f"/grade/{period}/{target_id}?saved_id={saved.id}", status_code=303
+        f"/grade/{period}/{target_id}?saved_id={saved.id}&live=1",
+        status_code=303,
     )
 
 
@@ -277,18 +295,75 @@ async def sync_retry(
     )
     target_name = target_row.name if target_row else sub.target_student_id
 
-    await sync_one_submission(
-        db,
-        user,
-        grader_name=user.name,
-        submission=sub,
-        target_name=target_name,
-        sites=(site,),  # type: ignore[arg-type]
+    await preinsert_pending(db, sub.id, (site,))  # type: ignore[arg-type]
+    fire_and_forget(
+        run_sync_background(
+            submission_id=sub.id,
+            grader_id=user.user_id,
+            grader_name=user.name,
+            site1_sid=user.site1_sid,
+            target_name=target_name,
+            sites=(site,),  # type: ignore[arg-type]
+        )
     )
     return RedirectResponse(
-        f"/grade/{sub.period}/{sub.target_student_id}?saved_id={sub.id}",
+        f"/grade/{sub.period}/{sub.target_student_id}?saved_id={sub.id}&live=1",
         status_code=303,
     )
+
+
+@router.get("/sync/{submission_id}/events")
+async def sync_events(
+    submission_id: int = Path(..., ge=1),
+    user: CurrentUser = Depends(require_user),
+    db: AsyncSession = Depends(get_session),
+) -> EventSourceResponse:
+    from net_grading.db.models import Submission
+
+    sub = await db.get(Submission, submission_id)
+    if sub is None or sub.user_id != user.user_id:
+        raise HTTPException(status_code=404, detail="submission_not_found")
+
+    async def gen():
+        q = bus.subscribe(submission_id)
+        try:
+            # 重播既有狀態，避免 client 連線前已完成的事件遺漏
+            for site_name, log in (await latest_logs_for_submission(db, submission_id)).items():
+                yield {
+                    "event": site_name,
+                    "data": json.dumps(
+                        {
+                            "site": site_name,
+                            "status": log.status,
+                            "external_id": log.external_id,
+                            "error": log.error_message,
+                            "duration_ms": log.duration_ms,
+                        }
+                    ),
+                }
+            # 如果全部都已經完成，直接關
+            logs_after = await latest_logs_for_submission(db, submission_id)
+            if logs_after and all(
+                l.status in ("success", "failed", "skipped") for l in logs_after.values()
+            ):
+                yield {"event": "done", "data": "{}"}
+                return
+
+            while True:
+                try:
+                    event = await asyncio.wait_for(q.get(), timeout=30.0)
+                except asyncio.TimeoutError:
+                    # 保活：瀏覽器 EventSource 預設 > 30s 無訊息會怒斷；送 comment
+                    yield {"event": "ping", "data": "{}"}
+                    continue
+                if is_sentinel(event):
+                    yield {"event": "done", "data": "{}"}
+                    break
+                yield {"event": event["site"], "data": json.dumps(event)}
+        finally:
+            bus.unsubscribe(submission_id, q)
+
+    return EventSourceResponse(gen())
 
 
 def _force_relogin() -> Response:
