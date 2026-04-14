@@ -1,72 +1,51 @@
-from fastapi import APIRouter, Depends, Form, Request
+"""Site2 憑證的 POST 端點（GET 頁面已內嵌到 dashboard 側欄）."""
+from fastapi import APIRouter, Depends, Form
 from fastapi.responses import RedirectResponse, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from net_grading.auth.middleware import require_user
 from net_grading.auth.session import CurrentUser
-from net_grading.auth.site2_creds import load_status, revoke, save_credentials
+from net_grading.auth.site2_creds import revoke, save_credentials
 from net_grading.db.engine import get_session
-from net_grading.routes.templating import templates
 from net_grading.sites.errors import SiteLoginError, SiteTransportError
 from net_grading.sites.site2 import Site2Client
 
 
-router = APIRouter(prefix="/settings")
+router = APIRouter()
 
 
-@router.get("")
-@router.get("/")
-async def settings_page(
-    request: Request,
-    user: CurrentUser = Depends(require_user),
-    db: AsyncSession = Depends(get_session),
-) -> Response:
-    site2 = await load_status(db, user.user_id)
-    return templates.TemplateResponse(
-        request, "settings.html", {"user": user, "site2": site2}
-    )
-
-
-@router.post("/site2")
+@router.post("/site2/connect")
 async def site2_connect(
-    request: Request,
     user: CurrentUser = Depends(require_user),
     db: AsyncSession = Depends(get_session),
     email: str = Form(...),
     password: str = Form(...),
     remember: str | None = Form(None),
+    period: str = Form("midterm"),
 ) -> Response:
+    redirect_to = f"/dashboard?period={period}"
     try:
         result = await Site2Client().login(email, password)
-    except SiteLoginError as exc:
-        return templates.TemplateResponse(
-            request,
-            "settings.html",
-            {"user": user, "site2": None, "error": f"登入失敗：{exc}"},
-            status_code=401,
+    except (SiteLoginError, SiteTransportError) as exc:
+        return RedirectResponse(
+            f"{redirect_to}&site2_error={_urlenc(str(exc))}",
+            status_code=303,
         )
-    except SiteTransportError as exc:
-        return templates.TemplateResponse(
-            request,
-            "settings.html",
-            {"user": user, "site2": None, "error": f"連線失敗：{exc}"},
-            status_code=502,
-        )
-
-    if remember:
-        await save_credentials(db, user.user_id, result)
-    # 若不記住我：只存 session 記憶體。M1–M4 尚未實作 session-only store；
-    # 目前都走 DB 儲存。未勾記住我 UX 留給 M7。
-    else:
-        await save_credentials(db, user.user_id, result)
-
-    return RedirectResponse("/settings", status_code=303)
+    await save_credentials(db, user.user_id, result)
+    return RedirectResponse(redirect_to, status_code=303)
 
 
 @router.post("/site2/revoke")
 async def site2_revoke(
     user: CurrentUser = Depends(require_user),
     db: AsyncSession = Depends(get_session),
+    period: str = Form("midterm"),
 ) -> Response:
     await revoke(db, user.user_id)
-    return RedirectResponse("/settings", status_code=303)
+    return RedirectResponse(f"/dashboard?period={period}", status_code=303)
+
+
+def _urlenc(s: str) -> str:
+    from urllib.parse import quote
+
+    return quote(s[:200])

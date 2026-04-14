@@ -1,35 +1,250 @@
 <!DOCTYPE html>
-<html lang="zh-Hant" class="{{ theme | default('dark') }}">
+<html lang="zh-Hant" class="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="color-scheme" content="dark light">
     <title>{% block title %}net-grading{% endblock %}</title>
     <script>
-        // 防 FOUC：立即套用主題
         (function () {
             var t = localStorage.getItem('theme') || 'dark';
             document.documentElement.className = t;
         })();
     </script>
-    <link rel="stylesheet" href="{{ url_for('static', path='css/app.css') }}">
     <style>
-        /* M2 placeholder style — Tailwind/design tokens 在 M7 完整建置 */
-        :root { color-scheme: light dark; --fg: #e8e8e8; --bg: #141414; --muted: #888; --accent: #8a9dff; --border: #2a2a2a; }
-        html.light { --fg: #1a1a1a; --bg: #fafafa; --muted: #666; --accent: #3a4ecb; --border: #e0e0e0; }
-        body { background: var(--bg); color: var(--fg); font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; margin: 0; min-height: 100vh; }
-        header.top { display: flex; justify-content: space-between; align-items: center; padding: 16px 32px; border-bottom: 1px solid var(--border); }
-        header.top .brand { font-weight: 600; letter-spacing: 0.02em; }
-        header.top nav { display: flex; gap: 12px; align-items: center; }
-        header.top button, header.top a { background: transparent; border: 1px solid var(--border); color: var(--fg); padding: 6px 12px; border-radius: 6px; cursor: pointer; font: inherit; text-decoration: none; }
-        header.top button:hover, header.top a:hover { border-color: var(--accent); }
-        main { max-width: 960px; margin: 0 auto; padding: 32px; }
-        h1 { font-weight: 600; letter-spacing: -0.01em; }
-        .muted { color: var(--muted); }
-        .error { color: #ff6464; padding: 8px 12px; border: 1px solid #5a2020; border-radius: 6px; background: rgba(255,50,50,0.05); }
-        input[type="text"], input[type="password"], input[type="email"] { background: transparent; border: 1px solid var(--border); color: var(--fg); padding: 10px 12px; border-radius: 6px; font: inherit; width: 100%; box-sizing: border-box; }
-        input:focus { outline: none; border-color: var(--accent); }
-        button.primary { background: var(--accent); color: #fff; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font: inherit; font-weight: 500; }
-        button.primary:hover { filter: brightness(1.1); }
+        /* ── Design tokens ─────────────────────────────────── */
+        html.dark {
+            --bg:          #0b0d12;
+            --surface:     #14171f;
+            --surface-hi:  #1a1e28;
+            --border:      #262b37;
+            --border-hi:   #343b4b;
+            --fg:          #e8eaf0;
+            --fg-muted:    #8b93a7;
+            --fg-subtle:   #5d6578;
+            --accent:      #7a8bff;
+            --accent-hi:   #9aa7ff;
+            --success:     #4ade80;
+            --warning:     #fbbf24;
+            --danger:      #f87171;
+            --self-bg:     rgba(122, 139, 255, 0.07);
+        }
+        html.light {
+            --bg:          #fafbfc;
+            --surface:     #ffffff;
+            --surface-hi:  #ffffff;
+            --border:      #e4e7ec;
+            --border-hi:   #cdd3dc;
+            --fg:          #0f1419;
+            --fg-muted:    #5a6474;
+            --fg-subtle:   #8a94a3;
+            --accent:      #4c5fd7;
+            --accent-hi:   #3a4cc2;
+            --success:     #16a34a;
+            --warning:     #d97706;
+            --danger:      #dc2626;
+            --self-bg:     rgba(76, 95, 215, 0.06);
+        }
+
+        /* ── Base ─────────────────────────────────────────── */
+        * { box-sizing: border-box; }
+        html, body { margin: 0; padding: 0; }
+        body {
+            background: var(--bg);
+            color: var(--fg);
+            font: 15px/1.55 -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", "Noto Sans TC", sans-serif;
+            min-height: 100vh;
+            -webkit-font-smoothing: antialiased;
+        }
+        .mono { font-family: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, monospace; }
+        h1 { font-weight: 700; letter-spacing: -0.03em; font-size: 32px; margin: 0 0 4px; }
+        h2 { font-weight: 600; letter-spacing: -0.01em; font-size: 18px; margin: 0 0 12px; }
+        a { color: var(--accent); text-decoration: none; }
+        a:hover { color: var(--accent-hi); }
+        .muted { color: var(--fg-muted); }
+        .subtle { color: var(--fg-subtle); }
+        kbd {
+            display: inline-block;
+            padding: 1px 6px;
+            background: var(--surface-hi);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            font: 12px ui-monospace, monospace;
+            color: var(--fg-muted);
+        }
+
+        /* ── Header ───────────────────────────────────────── */
+        header.top {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 14px 28px;
+            background: var(--surface);
+            border-bottom: 1px solid var(--border);
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            backdrop-filter: blur(8px);
+        }
+        header.top .brand {
+            font: 700 17px/1 ui-monospace, monospace;
+            letter-spacing: -0.02em;
+            color: var(--fg);
+        }
+        header.top nav {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            font-size: 13px;
+        }
+        header.top .user-info { color: var(--fg-muted); margin-right: 8px; }
+
+        /* ── Layout ───────────────────────────────────────── */
+        main {
+            max-width: 1100px;
+            margin: 0 auto;
+            padding: 36px 28px 80px;
+        }
+
+        /* ── Cards ────────────────────────────────────────── */
+        .card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 20px 22px;
+        }
+        .card-hi {
+            background: var(--surface-hi);
+            border: 1px solid var(--border-hi);
+            border-radius: 12px;
+            padding: 20px 22px;
+        }
+
+        /* ── Forms ────────────────────────────────────────── */
+        input[type="text"], input[type="password"], input[type="email"], input[type="number"], textarea, select {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            color: var(--fg);
+            padding: 9px 12px;
+            border-radius: 8px;
+            font: inherit;
+            width: 100%;
+            transition: border-color 120ms;
+        }
+        input:focus, textarea:focus, select:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px rgba(122, 139, 255, 0.12);
+        }
+        label { display: block; font-size: 13px; color: var(--fg-muted); margin-bottom: 6px; }
+        textarea { resize: vertical; font-family: inherit; min-height: 64px; }
+
+        /* ── Buttons ──────────────────────────────────────── */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--fg);
+            padding: 7px 14px;
+            border-radius: 8px;
+            font: inherit;
+            font-size: 13px;
+            cursor: pointer;
+            text-decoration: none;
+            transition: border-color 120ms, background 120ms;
+        }
+        .btn:hover { border-color: var(--border-hi); background: var(--surface-hi); }
+        .btn.primary {
+            background: var(--accent);
+            border-color: var(--accent);
+            color: #fff;
+            font-weight: 500;
+        }
+        .btn.primary:hover { background: var(--accent-hi); border-color: var(--accent-hi); }
+        .btn.danger {
+            border-color: var(--danger);
+            color: var(--danger);
+        }
+        .btn.danger:hover { background: rgba(248, 113, 113, 0.1); }
+
+        /* ── Pills ────────────────────────────────────────── */
+        .pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 10px;
+            border-radius: 999px;
+            border: 1px solid var(--border);
+            font-size: 12px;
+            color: var(--fg-muted);
+        }
+        .pill.success { border-color: var(--success); color: var(--success); }
+        .pill.failed  { border-color: var(--danger);  color: var(--danger); }
+        .pill.pending { border-color: var(--warning); color: var(--warning); }
+        .pill.skipped { border-color: var(--border);  color: var(--fg-subtle); }
+
+        /* ── Errors / banners ─────────────────────────────── */
+        .error {
+            padding: 10px 14px;
+            border: 1px solid var(--danger);
+            background: rgba(248, 113, 113, 0.08);
+            color: var(--danger);
+            border-radius: 8px;
+            font-size: 14px;
+        }
+        .info-banner {
+            padding: 10px 14px;
+            border: 1px solid var(--accent);
+            background: rgba(122, 139, 255, 0.08);
+            color: var(--accent);
+            border-radius: 8px;
+            font-size: 14px;
+        }
+
+        /* ── Tables ───────────────────────────────────────── */
+        table { width: 100%; border-collapse: collapse; }
+        thead tr { border-bottom: 1px solid var(--border); }
+        th { text-align: left; padding: 10px 8px; font-weight: 600; font-size: 13px; color: var(--fg-muted); text-transform: uppercase; letter-spacing: 0.04em; }
+        tbody tr { border-bottom: 1px solid var(--border); transition: background 120ms; }
+        tbody tr:hover { background: var(--surface-hi); }
+        td { padding: 14px 8px; }
+        tr.is-self { background: var(--self-bg); }
+        tr.is-self:hover { background: var(--self-bg); filter: brightness(1.2); }
+
+        /* ── Period tabs ──────────────────────────────────── */
+        .tabs {
+            display: inline-flex;
+            gap: 4px;
+            padding: 4px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+        }
+        .tabs a {
+            padding: 7px 16px;
+            border-radius: 7px;
+            font-size: 14px;
+            color: var(--fg-muted);
+            transition: all 120ms;
+        }
+        .tabs a:hover { color: var(--fg); background: var(--surface-hi); }
+        .tabs a.active {
+            background: var(--accent);
+            color: #fff;
+        }
+        .tabs a.disabled {
+            color: var(--fg-subtle);
+            pointer-events: none;
+            opacity: 0.4;
+        }
+
+        /* ── Helpers ──────────────────────────────────────── */
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        .row { display: flex; align-items: center; gap: 12px; }
+        .row-between { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+        .stack { display: flex; flex-direction: column; gap: 16px; }
     </style>
 </head>
 <body>
@@ -37,11 +252,12 @@
     <header class="top">
         <div class="brand">net-grading</div>
         <nav>
-            <span class="muted">{{ user.user_id }} · {{ user.name }}</span>
-            <a href="/settings">設定</a>
-            <button type="button" onclick="toggleTheme()">主題</button>
+            <span class="user-info">{{ user.user_id }} · {{ user.name }}</span>
+            <button type="button" class="btn" onclick="toggleTheme()" title="切換主題">
+                <span class="theme-icon-dark">●</span>
+            </button>
             <form method="post" action="/logout" style="margin:0">
-                <button type="submit">登出</button>
+                <button type="submit" class="btn">登出</button>
             </form>
         </nav>
     </header>
@@ -57,5 +273,6 @@
             localStorage.setItem('theme', next);
         }
     </script>
+    {% block scripts %}{% endblock %}
 </body>
 </html>

@@ -1,17 +1,19 @@
 {% extends "base.html" %}
 {% block title %}登入 · net-grading{% endblock %}
 {% block content %}
-<h1>學生互評同步閘道</h1>
-<p class="muted">輸入學號登入。本站會透明同步你的評分到 Site1 / Site2 / Site3。</p>
+<div style="max-width: 420px; margin: 60px auto 0;">
+    <h1 style="font-size: 28px;">學生互評同步閘道</h1>
+    <p class="muted" style="margin-top: 8px;">輸入學號登入。本站會透明同步評分到 Site1 / Site2 / Site3，不需重複填寫。</p>
 
-<form method="post" action="/login" style="margin-top: 24px; max-width: 360px;">
-    <label for="student_id" style="display: block; margin-bottom: 8px;">學號</label>
-    <input type="text" name="student_id" id="student_id" required autofocus
-           autocomplete="username" placeholder="例如：B11315009"
-           value="{{ student_id | default('') }}">
-    {% if error %}
-    <p class="error" style="margin-top: 12px;">{{ error }}</p>
-    {% endif %}
-    <button type="submit" class="primary" style="margin-top: 16px;">登入</button>
-</form>
+    <form method="post" action="/login" class="card" style="margin-top: 32px; padding: 28px;">
+        <label for="student_id">學號</label>
+        <input type="text" name="student_id" id="student_id" required autofocus
+               autocomplete="username" placeholder="例如：B11315009"
+               value="{{ student_id | default('') }}">
+        {% if error %}
+        <p class="error" style="margin-top: 16px;">{{ error }}</p>
+        {% endif %}
+        <button type="submit" class="btn primary" style="margin-top: 20px; width: 100%; justify-content: center;">登入</button>
+    </form>
+</div>
 {% endblock %}

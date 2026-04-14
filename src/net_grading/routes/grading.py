@@ -4,6 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from net_grading.auth.middleware import optional_user, require_user
 from net_grading.auth.session import CurrentUser
+from net_grading.auth.site2_creds import load_status as load_site2_status
 from net_grading.db.engine import get_session
 from net_grading.db.models import TargetCache
 from net_grading.routes.templating import templates
@@ -62,6 +63,7 @@ async def dashboard(
     request: Request,
     user: CurrentUser = Depends(require_user),
     period: Period = Query("midterm"),
+    site2_error: str | None = Query(None),
     db: AsyncSession = Depends(get_session),
 ) -> Response:
     if period not in ("midterm", "final"):
@@ -71,16 +73,12 @@ async def dashboard(
         periods = await _load_periods_from_user(user.site1_sid)
     except SiteTokenExpired:
         return _force_relogin()
-    except SiteError as exc:
-        # Site1 暫時無法連線：仍用本地快取顯示
+    except SiteError:
         periods = ()
 
     reload_error = await _refresh_targets_if_needed(db, user, period)
-
-    # 首次匯入（僅當本地該期別為空時觸發一次）
     import_summary = await initial_import(db, user, period)
 
-    # 如有 pending 衝突，強制導向 /conflicts
     pending = await pending_conflicts_count(db, user.user_id)
     if pending > 0:
         return RedirectResponse("/conflicts", status_code=303)
@@ -88,6 +86,7 @@ async def dashboard(
     targets = await list_dashboard_targets(db, user.user_id, period)
     evaluated_count = sum(1 for t in targets if t.local_total is not None)
     period_label = next((p.label for p in periods if p.code == period), period)
+    site2_status = await load_site2_status(db, user.user_id)
 
     return templates.TemplateResponse(
         request,
@@ -101,6 +100,8 @@ async def dashboard(
             "evaluated_count": evaluated_count,
             "reload_error": reload_error,
             "import_summary": import_summary,
+            "site2": site2_status,
+            "site2_error": site2_error,
         },
     )
 

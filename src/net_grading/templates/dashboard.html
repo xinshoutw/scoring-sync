@@ -1,19 +1,20 @@
 {% extends "base.html" %}
 {% block title %}Dashboard · net-grading{% endblock %}
 {% block content %}
-<h1>{{ period_label }}</h1>
-<p class="muted">{{ user.name }}（{{ user.class_name }}） · {{ user.user_id }}</p>
-
-<nav style="margin-top: 24px; display: flex; gap: 8px;">
-    {% for p in periods %}
-    <a href="/dashboard?period={{ p.code }}"
-       style="padding: 6px 16px; border-radius: 6px; border: 1px solid var(--border);
-              background: {% if p.code == period %}var(--accent); color: #fff{% else %}transparent{% endif %};
-              {% if not p.is_open %}opacity: 0.5; pointer-events: none;{% endif %}">
-        {{ p.label }}{% if not p.is_open %}（未開放）{% endif %}
-    </a>
-    {% endfor %}
-</nav>
+<div class="row-between" style="align-items: flex-end; margin-bottom: 8px;">
+    <div>
+        <h1>{{ period_label or '期中報告' }}</h1>
+        <p class="muted">{{ user.name }}（{{ user.class_name }}） · {{ user.user_id }}</p>
+    </div>
+    <div class="tabs">
+        {% for p in periods %}
+        <a href="/dashboard?period={{ p.code }}"
+           class="{% if p.code == period %}active{% endif %}{% if not p.is_open %} disabled{% endif %}">
+            {{ p.label }}{% if not p.is_open %}（未開放）{% endif %}
+        </a>
+        {% endfor %}
+    </div>
+</div>
 
 {% if reload_error %}
 <p class="error" style="margin-top: 16px;">Site1 重整失敗：{{ reload_error }}（顯示的是本地快取）</p>
@@ -22,54 +23,100 @@
 {% if import_summary and import_summary.get('skipped') is none %}
     {% set s = import_summary %}
     {% if s.imported_site1 or s.imported_site2 or s.agreements %}
-    <p style="margin-top: 16px; padding: 10px 14px; border: 1px solid var(--accent); border-radius: 6px; font-size: 13px;">
-        首次匯入完成：
-        Site1 單邊 {{ s.imported_site1 }} 筆 · Site2 單邊 {{ s.imported_site2 }} 筆 · 兩邊一致 {{ s.agreements }} 筆
+    <p class="info-banner" style="margin-top: 16px;">
+        首次匯入完成：Site1 單邊 <strong>{{ s.imported_site1 }}</strong> 筆 · Site2 單邊 <strong>{{ s.imported_site2 }}</strong> 筆 · 兩邊一致 <strong>{{ s.agreements }}</strong> 筆
     </p>
-    {% endif %}
-    {% if s.errors %}
-    <p class="error" style="margin-top: 12px; font-size: 13px;">匯入部分失敗：{{ s.errors }}</p>
     {% endif %}
 {% endif %}
 
-<p class="muted" style="margin-top: 24px;">
-    {{ targets | length }} 位待評 · 已評 {{ evaluated_count }} · 未評 {{ targets | length - evaluated_count }}
-</p>
+<div style="display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 24px; margin-top: 24px; align-items: start;">
 
-<table style="width: 100%; margin-top: 16px; border-collapse: collapse;">
-    <thead>
-        <tr style="border-bottom: 1px solid var(--border); text-align: left;">
-            <th style="padding: 8px 0;">學號</th>
-            <th>姓名</th>
-            <th>班級</th>
-            <th style="text-align: right;">本地總分</th>
-            <th style="text-align: right;">最近送出</th>
-            <th></th>
-        </tr>
-    </thead>
-    <tbody>
-    {% for t in targets %}
-        <tr style="border-bottom: 1px solid var(--border); {% if t.is_self %}background: rgba(138,157,255,0.08);{% endif %}">
-            <td style="padding: 12px 0; font-family: ui-monospace, monospace;">{{ t.student_id }}</td>
-            <td>{{ t.name }}{% if t.is_self %} <span class="muted">（自評）</span>{% endif %}</td>
-            <td class="muted">{{ t.class_name }}</td>
-            <td style="text-align: right; font-family: ui-monospace, monospace;">
-                {% if t.local_total is not none %}
-                    {{ t.local_total }}/100
-                {% else %}
-                    <span class="muted">—</span>
-                {% endif %}
-            </td>
-            <td style="text-align: right; font-family: ui-monospace, monospace;" class="muted">
-                {{ t.local_submitted_at.strftime('%m-%d %H:%M') if t.local_submitted_at else '—' }}
-            </td>
-            <td style="text-align: right;">
-                <a href="/grade/{{ period }}/{{ t.student_id }}">
-                    {% if t.local_total is not none %}編輯{% else %}評分{% endif %} →
-                </a>
-            </td>
-        </tr>
-    {% endfor %}
-    </tbody>
-</table>
+    <!-- 主：學生列表 -->
+    <section class="card">
+        <div class="row-between" style="margin-bottom: 12px;">
+            <h2 style="margin: 0;">待評列表</h2>
+            <span class="muted mono" style="font-size: 13px;">
+                {{ targets | length }} 位 · 已評 {{ evaluated_count }} · 未評 {{ targets | length - evaluated_count }}
+            </span>
+        </div>
+        <table>
+            <thead>
+                <tr>
+                    <th>學號</th>
+                    <th>姓名</th>
+                    <th>班級</th>
+                    <th style="text-align: right;">本地總分</th>
+                    <th style="text-align: right;">更新</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for t in targets %}
+                <tr class="{% if t.is_self %}is-self{% endif %}">
+                    <td class="mono">{{ t.student_id }}</td>
+                    <td>{{ t.name }}{% if t.is_self %} <span class="subtle">(自評)</span>{% endif %}</td>
+                    <td class="muted">{{ t.class_name }}</td>
+                    <td class="mono" style="text-align: right;">
+                        {% if t.local_total is not none %}
+                            <strong>{{ t.local_total }}</strong><span class="subtle">/100</span>
+                        {% else %}<span class="subtle">—</span>{% endif %}
+                    </td>
+                    <td class="mono subtle" style="text-align: right; font-size: 13px;">
+                        {{ t.local_submitted_at.strftime('%m-%d %H:%M') if t.local_submitted_at else '—' }}
+                    </td>
+                    <td style="text-align: right;">
+                        <a href="/grade/{{ period }}/{{ t.student_id }}" class="btn">
+                            {% if t.local_total is not none %}編輯{% else %}評分{% endif %} →
+                        </a>
+                    </td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </section>
+
+    <!-- 側：Site2 連線 widget -->
+    <aside class="card">
+        <h2 style="margin-bottom: 4px;">Site2 連線</h2>
+        <p class="subtle" style="font-size: 12px; margin: 0 0 16px;">Firebase 帳號（ntust-grading）</p>
+
+        {% if site2 %}
+            <div class="row" style="gap: 8px; margin-bottom: 12px;">
+                <span class="pill success" style="font-size: 11px;">已連線</span>
+            </div>
+            <p class="mono" style="font-size: 13px; word-break: break-all;">{{ site2.email }}</p>
+            <p class="subtle" style="font-size: 11px; margin-top: 4px;">
+                Token 到期：{{ site2.id_token_valid_until.strftime('%H:%M') }}（UTC，會自動續期）
+            </p>
+            <form method="post" action="/site2/revoke" style="margin-top: 16px;">
+                <input type="hidden" name="period" value="{{ period }}">
+                <button type="submit" class="btn danger" style="width: 100%; justify-content: center;">中斷連線</button>
+            </form>
+        {% else %}
+            {% if site2_error %}
+            <p class="error" style="margin-bottom: 12px; font-size: 13px;">{{ site2_error }}</p>
+            {% endif %}
+            <form method="post" action="/site2/connect">
+                <input type="hidden" name="period" value="{{ period }}">
+
+                <label for="s2_email" style="margin-top: 4px;">Email</label>
+                <input type="email" name="email" id="s2_email" required autocomplete="username"
+                       placeholder="{{ user.user_id | lower }}@mail.ntust.edu.tw">
+
+                <label for="s2_password" style="margin-top: 14px;">密碼</label>
+                <input type="password" name="password" id="s2_password" required autocomplete="current-password">
+
+                <label style="margin-top: 14px; display: flex; align-items: center; gap: 6px; font-size: 12px;">
+                    <input type="checkbox" name="remember" value="1" checked style="width: auto;">
+                    記住我（加密存 refreshToken）
+                </label>
+
+                <button type="submit" class="btn primary" style="margin-top: 16px; width: 100%; justify-content: center;">連線</button>
+            </form>
+            <p class="subtle" style="margin-top: 14px; font-size: 11px; line-height: 1.5;">
+                未連線時 Site2 同步會被 skip。本站不會儲存你的密碼，只保留 Fernet 加密的 refresh token。
+            </p>
+        {% endif %}
+    </aside>
+</div>
 {% endblock %}
