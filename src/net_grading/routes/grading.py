@@ -63,7 +63,33 @@ async def _refresh_targets_if_needed(
 
 @router.get("/")
 async def root(user: CurrentUser | None = Depends(optional_user)) -> Response:
-    return RedirectResponse("/dashboard" if user else "/login", status_code=303)
+    if user is None:
+        return RedirectResponse("/login", status_code=303)
+    return RedirectResponse("/welcome" if not user.welcomed else "/dashboard", status_code=303)
+
+
+@router.get("/welcome")
+async def welcome(
+    request: Request,
+    user: CurrentUser = Depends(require_user),
+    site2_error: str | None = Query(None),
+) -> Response:
+    if user.welcomed:
+        return RedirectResponse("/dashboard?period=midterm", status_code=303)
+    cfg = get_settings()
+    return templates.TemplateResponse(
+        request,
+        "welcome.html",
+        {
+            "user": user,
+            "site2_error": site2_error,
+            "site_labels": {
+                "site1": cfg.site1_label,
+                "site2": cfg.site2_label,
+                "site3": cfg.site3_label,
+            },
+        },
+    )
 
 
 @router.get("/dashboard")
@@ -74,6 +100,8 @@ async def dashboard(
     site2_error: str | None = Query(None),
     db: AsyncSession = Depends(get_session),
 ) -> Response:
+    if not user.welcomed:
+        return RedirectResponse("/welcome", status_code=303)
     if period not in ("midterm", "final"):
         raise HTTPException(status_code=400, detail="invalid_period")
 

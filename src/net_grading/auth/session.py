@@ -27,6 +27,7 @@ class CurrentUser:
     sync_site1: bool
     sync_site2: bool
     sync_site3: bool
+    welcomed: bool
 
     def enabled_sites(self) -> tuple[str, ...]:
         out: list[str] = []
@@ -101,6 +102,7 @@ async def load_session(db: AsyncSession, session_id: str) -> CurrentUser | None:
         sync_site1=bool(user.sync_site1),
         sync_site2=bool(user.sync_site2),
         sync_site3=bool(user.sync_site3),
+        welcomed=bool(user.welcomed),
     )
 
 

@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}連線 Site2 · scoring-sync{% endblock %}
+{% block content %}
+<div style="max-width: 520px; margin: 40px auto 0;">
+    <h1>歡迎，{{ user.name }}</h1>
+    <p class="muted" style="margin-top: 6px;">
+        在進入評分前，可選擇先連線 <strong>{{ site_labels.site2 }}</strong>。
+        這樣系統能從兩站拉取你已填過的資料並比對，讓既有紀錄不會遺失。
+    </p>
+
+    <section class="card-hi" style="margin-top: 24px;">
+        <h2 style="margin-bottom: 6px;">{{ site_labels.site2 }}</h2>
+        <p class="subtle" style="font-size: 12px; margin: 0 0 16px;">Firebase 帳號</p>
+
+        {% if site2_error %}
+        <p class="error" style="margin-bottom: 12px; font-size: 13px;">{{ site2_error }}</p>
+        {% endif %}
+
+        <form method="post" action="/site2/connect">
+            <input type="hidden" name="period" value="midterm">
+            <input type="hidden" name="from_welcome" value="1">
+
+            <label for="s2_email">Email</label>
+            <input type="email" name="email" id="s2_email" required
+                   value="{{ user.user_id | lower }}@mail.ntust.edu.tw">
+
+            <label for="s2_password" style="margin-top: 14px;">密碼</label>
+            <input type="password" name="password" id="s2_password" required autofocus>
+
+            <label style="margin-top: 14px; display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--fg-muted);">
+                <input type="checkbox" name="remember" value="1" checked style="width: auto;">
+                記住我（加密存 refreshToken）
+            </label>
+
+            <button type="submit" class="btn primary" style="margin-top: 18px; width: 100%; justify-content: center; padding: 10px;">
+                連線並繼續
+            </button>
+        </form>
+
+        <form method="post" action="/welcome/skip" style="margin-top: 10px;">
+            <button type="submit" class="btn" style="width: 100%; justify-content: center;">
+                跳過，之後在側欄再連線
+            </button>
+        </form>
+
+        <p class="subtle" style="margin-top: 16px; font-size: 11px; line-height: 1.55;">
+            跳過亦可 — 稍後可隨時在 dashboard 右側連線。
+            <strong>但若你兩站都已有評分紀錄，建議先在此連線，系統才能偵測不一致並讓你選版本。</strong>
+        </p>
+    </section>
+</div>
+{% endblock %}

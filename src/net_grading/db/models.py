@@ -32,6 +32,7 @@ class User(Base):
     sync_site1: Mapped[int] = mapped_column(Integer, default=1)
     sync_site2: Mapped[int] = mapped_column(Integer, default=1)
     sync_site3: Mapped[int] = mapped_column(Integer, default=1)
+    welcomed: Mapped[int] = mapped_column(Integer, default=0)
 
 
 class Session(Base):

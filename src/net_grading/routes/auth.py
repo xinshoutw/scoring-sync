@@ -77,7 +77,14 @@ async def login_submit(
 
     session_id, expires_at = await create_session(db, result)
 
-    response = RedirectResponse("/dashboard", status_code=303)
+    # 首次登入沒 welcomed 過就先進 onboarding
+    from net_grading.db.models import User as _U
+    _u = await db.get(_U, result.identity.actor_id)
+    welcomed = bool(_u.welcomed) if _u else False
+
+    response = RedirectResponse(
+        "/dashboard" if welcomed else "/welcome", status_code=303
+    )
     settings = get_settings()
     max_age = int((expires_at - datetime.now(timezone.utc)).total_seconds())
     response.set_cookie(

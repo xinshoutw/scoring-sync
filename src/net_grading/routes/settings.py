@@ -23,17 +23,38 @@ async def site2_connect(
     password: str = Form(...),
     remember: str | None = Form(None),
     period: str = Form("midterm"),
+    from_welcome: str | None = Form(None),
 ) -> Response:
-    redirect_to = f"/dashboard?period={period}"
+    dashboard_url = f"/dashboard?period={period}"
+    welcome_url = "/welcome"
+    failure_target = welcome_url if from_welcome else dashboard_url
     try:
         result = await Site2Client().login(email, password)
     except (SiteLoginError, SiteTransportError) as exc:
+        sep = "&" if "?" in failure_target else "?"
         return RedirectResponse(
-            f"{redirect_to}&site2_error={_urlenc(str(exc))}",
+            f"{failure_target}{sep}site2_error={_urlenc(str(exc))}",
             status_code=303,
         )
     await save_credentials(db, user.user_id, result)
-    return RedirectResponse(redirect_to, status_code=303)
+    # 成功連線也算完成 onboarding
+    row = await db.get(User, user.user_id)
+    if row is not None and not row.welcomed:
+        row.welcomed = 1
+        await db.commit()
+    return RedirectResponse(dashboard_url, status_code=303)
+
+
+@router.post("/welcome/skip")
+async def welcome_skip(
+    user: CurrentUser = Depends(require_user),
+    db: AsyncSession = Depends(get_session),
+) -> Response:
+    row = await db.get(User, user.user_id)
+    if row is not None and not row.welcomed:
+        row.welcomed = 1
+        await db.commit()
+    return RedirectResponse("/dashboard?period=midterm", status_code=303)
 
 
 @router.post("/site2/revoke")
