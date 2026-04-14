@@ -99,11 +99,11 @@
                     <div class="subtle" style="font-size: 12px; margin-top: 2px;">無需登入</div>
                 </div>
                 <form method="post" action="/sync-prefs/site1/toggle" style="margin: 0;">
-                    <input type="hidden" name="period" value="{{ period }}">
-                    <label class="switch" title="切換同步">
-                        <input type="checkbox" onchange="this.form.submit()" {% if user.sync_site1 %}checked{% endif %}>
-                        <span class="slider"></span>
-                    </label>
+<!--                    <input type="hidden" name="period" value="{{ period }}">-->
+<!--                    <label class="switch" title="切換同步">-->
+<!--                        <input type="checkbox" onchange="this.form.submit()" {% if user.sync_site1 %}checked{% endif %}>-->
+<!--                        <span class="slider"></span>-->
+<!--                    </label>-->
                 </form>
             </div>
         </div>
@@ -119,19 +119,19 @@
                 </div>
                 <form method="post" action="/sync-prefs/site2/toggle" style="margin: 0;">
                     <input type="hidden" name="period" value="{{ period }}">
-                    <label class="switch">
-                        <input type="checkbox" onchange="this.form.submit()" {% if user.sync_site2 %}checked{% endif %}>
-                        <span class="slider"></span>
-                    </label>
+<!--                    <label class="switch">-->
+<!--                        <input type="checkbox" onchange="this.form.submit()" {% if user.sync_site2 %}checked{% endif %}>-->
+<!--                        <span class="slider"></span>-->
+<!--                    </label>-->
                 </form>
             </div>
 
             {% if site2_connected %}
             <p class="mono" style="margin-top: 12px; font-size: 13px; word-break: break-all;">{{ site2.email }}</p>
-            <form method="post" action="/site2/revoke" style="margin-top: 12px;">
-                <input type="hidden" name="period" value="{{ period }}">
-                <button type="submit" class="btn danger" style="width: 100%; justify-content: center; font-size: 12px;">中斷連線</button>
-            </form>
+<!--            <form method="post" action="/site2/revoke" style="margin-top: 12px;">-->
+<!--                <input type="hidden" name="period" value="{{ period }}">-->
+<!--                <button type="submit" class="btn danger" style="width: 100%; justify-content: center; font-size: 12px;">中斷連線</button>-->
+<!--            </form>-->
             {% else %}
                 {% if site2_error %}
                 <p class="error" style="margin-top: 12px; font-size: 12px;">{{ site2_error }}</p>
@@ -160,11 +160,11 @@
                     <div class="subtle" style="font-size: 12px; margin-top: 2px;">無需登入</div>
                 </div>
                 <form method="post" action="/sync-prefs/site3/toggle" style="margin: 0;">
-                    <input type="hidden" name="period" value="{{ period }}">
-                    <label class="switch">
-                        <input type="checkbox" onchange="this.form.submit()" {% if user.sync_site3 %}checked{% endif %}>
-                        <span class="slider"></span>
-                    </label>
+<!--                    <input type="hidden" name="period" value="{{ period }}">-->
+<!--                    <label class="switch">-->
+<!--                        <input type="checkbox" onchange="this.form.submit()" {% if user.sync_site3 %}checked{% endif %}>-->
+<!--                        <span class="slider"></span>-->
+<!--                    </label>-->
                 </form>
             </div>
         </div>

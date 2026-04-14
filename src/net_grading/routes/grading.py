@@ -32,6 +32,7 @@ from net_grading.sync.pull import (
     list_skipped_targets,
     pending_conflicts_count,
 )
+from net_grading.sync.recheck import schedule_recheck
 from sqlalchemy import select
 import asyncio
 import json
@@ -118,6 +119,9 @@ async def dashboard(
 
     reload_error = await _refresh_targets_if_needed(db, user, period)
     import_summary = await initial_import(db, user, period)
+
+    # 節流的背景 recheck：每位使用者 30s 最多一次；前景 render 不等它
+    schedule_recheck(user.user_id, period, user.site1_sid)
 
     pending = await pending_conflicts_count(db, user.user_id)
     if pending > 0:

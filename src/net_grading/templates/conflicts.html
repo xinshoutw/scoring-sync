@@ -19,7 +19,7 @@
             <strong style="font-size: 16px;">{{ item.target_name or item.target_student_id }}</strong>
             <span class="muted mono" style="font-size: 13px;">{{ item.target_student_id }}</span>
             {% if item.target_class_name %}
-            <span class="muted" style="font-size: 13px;">· {{ item.target_class_name }}</span>
+            <span class="muted" style="font-size: 13px;">{{ item.target_class_name }}</span>
             {% endif %}
         </div>
         <span class="pill">{{ item.period }}</span>

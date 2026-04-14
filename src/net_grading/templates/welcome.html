@@ -4,7 +4,7 @@
 <div style="max-width: 520px; margin: 40px auto 0;">
     <h1>歡迎，{{ user.name }}</h1>
     <p class="muted" style="margin-top: 6px;">
-        在進入評分前，可選擇先登入 <strong>{{ site_labels.site2 }}</strong>。
+        在進入評分前，請先登入 <strong>{{ site_labels.site2 }}</strong>。
         系統能夠檢查您已填過的資料並比對，讓既有紀錄不用再重新填寫！
     </p>
 
@@ -37,11 +37,11 @@
             </button>
         </form>
 
-        <form method="post" action="/welcome/skip" style="margin-top: 10px;">
-            <button type="submit" class="btn" style="width: 100%; justify-content: center;">
-                暫時跳過
-            </button>
-        </form>
+<!--        <form method="post" action="/welcome/skip" style="margin-top: 10px;">-->
+<!--            <button type="submit" class="btn" style="width: 100%; justify-content: center;">-->
+<!--                暫時跳過-->
+<!--            </button>-->
+<!--        </form>-->
 
         <p class="subtle" style="text-align: center; margin-top: 16px; font-size: 11px; line-height: 1.55;">
             <strong>若您已有評分紀錄，建議先在此連線，系統才能夠及時偵測到不一致並讓解決衝突</strong>

@@ -152,6 +152,94 @@ async def list_skipped_targets(
     return {r for r in (await db.execute(stmt)).scalars().all()}
 
 
+async def recheck_conflicts(
+    db: AsyncSession,
+    user_id: str,
+    period: Period,
+    site1_sid: str,
+) -> dict:
+    """重新拉 Site1 / Site2，對每位被評學生比對：
+    - 不一致 + 沒有未決/skip 紀錄 → INSERT conflict_events(resolution=NULL)
+    - 一致 + 有現存 conflict_events → DELETE（obsolete，兩站已經自行對齊）
+    - 絕不動 submissions；只動 conflict_events
+    """
+    site1 = Site1Client()
+    try:
+        targets = await site1.list_targets(site1_sid, period)
+    except SiteError:
+        return {"error": "site1_targets_failed"}
+
+    sem = asyncio.Semaphore(10)
+
+    async def _one_s1(tid: str):
+        async with sem:
+            try:
+                return await site1.fetch_submission(site1_sid, period, tid)
+            except SiteError:
+                return None
+
+    evaluated = [t for t in targets if t.evaluated]
+    s1_list = await asyncio.gather(*(_one_s1(t.student_id) for t in evaluated))
+    site1_by_target = {s.target_student_id: s for s in s1_list if s is not None}
+
+    site2_by_target: dict = {}
+    id_token = await get_id_token(db, user_id)
+    if id_token is not None:
+        try:
+            s2_list = await Site2Client().list_submissions(id_token, user_id, period)
+            for snap in s2_list:
+                site2_by_target[snap.target_student_id] = snap
+        except SiteError:
+            pass
+
+    # 抓現有 conflicts (含 skip) 做 dedupe / 對齊後的清掃
+    existing_stmt = select(ConflictEvent).where(
+        ConflictEvent.user_id == user_id,
+        ConflictEvent.period == period,
+    )
+    existing_rows = (await db.execute(existing_stmt)).scalars().all()
+    existing_by_target: dict[str, ConflictEvent] = {
+        r.target_student_id: r for r in existing_rows
+    }
+
+    new_conflicts = 0
+    obsoleted = 0
+
+    all_targets = set(site1_by_target.keys()) | set(site2_by_target.keys())
+    for tid in all_targets:
+        s1 = site1_by_target.get(tid)
+        s2 = site2_by_target.get(tid)
+        prev = existing_by_target.get(tid)
+
+        if not (s1 and s2):
+            continue  # 僅單邊有資料 → 非衝突語意
+
+        aligned = _same_scores(s1, s2) and s1.comment == s2.comment
+
+        if aligned:
+            if prev is not None:
+                await db.delete(prev)
+                obsoleted += 1
+        else:
+            if prev is None:
+                db.add(
+                    ConflictEvent(
+                        user_id=user_id,
+                        period=period,
+                        target_student_id=tid,
+                        site1_snapshot=_snap_json(s1),
+                        site2_snapshot=_snap_json(s2),
+                        resolution=None,
+                    )
+                )
+                new_conflicts += 1
+            # 若 prev.resolution == 'skip' 但內容又變了 → 保留 skip 不打擾
+            # （使用者曾明確跳過；recheck 不該強拉回來）
+
+    await db.commit()
+    return {"new_conflicts": new_conflicts, "obsoleted": obsoleted}
+
+
 async def list_pending_conflicts(
     db: AsyncSession, user_id: str
 ) -> list[ConflictEvent]:
