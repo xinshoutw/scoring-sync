@@ -20,7 +20,7 @@ from net_grading.routes.templating import templates
 
 _STATIC_DIR = Path(__file__).parent / "static"
 
-# 進程啟動唯一 id；瀏覽器 heartbeat 比對 → 偵測重啟
+# 進程啟動唯一 id；前端在重連／重新聚焦時比對 /health.instance_id → 偵測重啟
 SERVER_INSTANCE_ID = secrets.token_hex(8)
 
 
@@ -117,11 +117,16 @@ def create_app() -> FastAPI:
 
     @app.get("/health")
     async def health() -> JSONResponse:
-        return JSONResponse({"status": "ok", "env": settings.app_env})
-
-    @app.get("/heartbeat")
-    async def heartbeat() -> JSONResponse:
-        resp = JSONResponse({"id": SERVER_INSTANCE_ID})
+        # 同時承擔 liveness probe 與前端重連偵測：
+        #   - status/env → 標準健康檢查（Kubernetes / ALB / uptime monitor）
+        #   - instance_id → 前端比對進程啟動 id，不同代表 server 已重啟 → reload
+        resp = JSONResponse(
+            {
+                "status": "ok",
+                "env": settings.app_env,
+                "instance_id": SERVER_INSTANCE_ID,
+            }
+        )
         resp.headers["cache-control"] = "no-store, no-cache, must-revalidate"
         return resp
 
