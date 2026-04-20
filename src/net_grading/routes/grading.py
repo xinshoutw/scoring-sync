@@ -4,6 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from net_grading.auth.middleware import optional_user, require_user
 from net_grading.auth.session import CurrentUser
+from net_grading.routes.rate_limit import throttle_submit
 from net_grading.auth.site2_creds import load_status as load_site2_status
 from net_grading.config import get_settings
 from net_grading.db.engine import get_session
@@ -271,7 +272,7 @@ async def grade_submit(
     request: Request,
     period: Period = Path(...),
     target_id: str = Path(..., pattern=r"^[A-Za-z0-9]+$"),
-    user: CurrentUser = Depends(require_user),
+    user: CurrentUser = Depends(throttle_submit),
     db: AsyncSession = Depends(get_session),
     score_topic: int = Form(...),
     score_content: int = Form(...),

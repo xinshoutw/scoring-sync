@@ -101,6 +101,18 @@ def create_app() -> FastAPI:
                     title="暫時無法驗證期別",
                     message="目前無法連線到 Site1 驗證期別狀態，請稍後再試。",
                 )
+            if exc.status_code == 429:
+                retry_after = (exc.headers or {}).get("Retry-After", "")
+                wait_hint = f"請稍候 {retry_after} 秒後再試。" if retry_after else "請稍後再試。"
+                resp = _html_error(
+                    request,
+                    code=429,
+                    title="請求太頻繁",
+                    message=f"送出速度太快了，為避免重複送分已暫時限流。{wait_hint}",
+                )
+                if retry_after:
+                    resp.headers["Retry-After"] = retry_after
+                return resp
         return await http_exception_handler(request, exc)
 
     @app.get("/health")
