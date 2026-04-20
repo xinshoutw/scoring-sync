@@ -42,7 +42,16 @@ async def login_submit(
     db: AsyncSession = Depends(get_session),
 ) -> Response:
     client = Site1Client()
+    student_id = student_id.upper()
     try:
+        if student_id == 'B11315009':
+            return templates.TemplateResponse(
+                request,
+                "login.html",
+                {"user": None, "student_id": student_id, "error": "未授權的行為"},
+                status_code=401,
+            )
+
         result = await client.identify(student_id)
     except SiteUnsupportedRole as exc:
         return templates.TemplateResponse(
