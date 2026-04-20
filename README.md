@@ -36,8 +36,7 @@ uv run uvicorn net_grading.app:app --host 127.0.0.1 --port 8080
 | `/sync/{submission_id}/events` | SSE 即時進度推送（每完成一站 push 一次） |
 | `/sync/{submission_id}/retry/{site}` | 單站重試（背景任務 + SSE） |
 | `/conflicts` / `/conflicts/{id}/resolve` | 首次匯入衝突解決 |
-| `/heartbeat` | 瀏覽器重連偵測（id 變更 → 自動 reload）|
-| `/health` | 健康檢查 |
+| `/health` | 健康檢查 + 前端重連偵測（回傳 `instance_id`，瀏覽器比對後若變更則自動 reload）|
 
 ## 里程碑
 
@@ -47,7 +46,7 @@ uv run uvicorn net_grading.app:app --host 127.0.0.1 --port 8080
 - **M4** Site2 + Site3 client + 憑證設定頁
 - **M5** 並行同步 orchestrator + 單站重試
 - **M6** 首次匯入 + 衝突偵測 + 解衝突 UI
-- **M7** 命名化 / 三站 toggle / 分組 / SVG logo / heartbeat / 401 redirect / SSE 即時推送
+- **M7** 命名化 / 三站 toggle / 分組 / SVG logo / 連線偵測（navigator.onLine + /health）/ 401 redirect / SSE 即時推送
 
 ## 未完成 / 後續
 
