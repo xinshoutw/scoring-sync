@@ -103,12 +103,12 @@ def create_app() -> FastAPI:
                 )
             if exc.status_code == 429:
                 retry_after = (exc.headers or {}).get("Retry-After", "")
-                wait_hint = f"請稍候 {retry_after} 秒後再試。" if retry_after else "請稍後再試。"
+                wait_hint = f"請 {retry_after} 秒後再試 ＠＠" if retry_after else "請稍後再試＠＠"
                 resp = _html_error(
                     request,
                     code=429,
-                    title="請求太頻繁",
-                    message=f"送出速度太快了，為避免重複送分已暫時限流。{wait_hint}",
+                    title="好... 好快",
+                    message=f"速度太快了，您已被暫時限流。{wait_hint}",
                 )
                 if retry_after:
                     resp.headers["Retry-After"] = retry_after
