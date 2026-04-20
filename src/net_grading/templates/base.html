@@ -459,42 +459,79 @@
             localStorage.setItem('theme', next);
         }
 
-        // ── Heartbeat：每 3 秒 ping /heartbeat；斷線顯示 banner、恢復後 server id 變更則 reload ──
+        // ── 連線偵測：以 navigator.onLine + online/offline/visibilitychange 為主，
+        //    僅在「上線 / 取得焦點 / 分頁可見」時打 /health 確認 server 是否重啟（ID 變了就 reload）。
+        //    沒有 3 秒輪詢，走瀏覽器原生事件；閒置時另做長週期背景檢查（60s）確保 server 中途崩潰也偵測得到。──
         (function () {
             var banner = document.getElementById('reconnect-banner');
             var textEl = document.getElementById('reconnect-text');
             var initialId = null;
             var wasDown = false;
+            var inFlight = false;
+            var BACKGROUND_INTERVAL_MS = 60000;
 
-            async function ping() {
-                try {
-                    var r = await fetch('/heartbeat', { cache: 'no-store', credentials: 'same-origin' });
-                    if (!r.ok) throw new Error('bad_status_' + r.status);
-                    var d = await r.json();
-                    if (initialId === null) {
-                        initialId = d.id;
-                    } else if (d.id !== initialId) {
-                        // 伺服器已重啟且目前連線新版 → 直接 reload 取最新資料
-                        textEl.textContent = '伺服器已更新，重新載入頁面…';
-                        setTimeout(function () { window.location.reload(); }, 400);
-                        return;
-                    }
-                    if (wasDown) {
-                        textEl.textContent = '已重新連線';
-                        setTimeout(function () { banner.classList.remove('visible'); }, 600);
-                        wasDown = false;
-                    }
-                } catch (e) {
-                    wasDown = true;
-                    textEl.textContent = '連線中斷，正在重新連線…';
-                    banner.classList.add('visible');
+            function showDown(msg) {
+                wasDown = true;
+                textEl.textContent = msg;
+                banner.classList.add('visible');
+            }
+
+            function showUp() {
+                if (wasDown) {
+                    textEl.textContent = '已重新連線';
+                    setTimeout(function () { banner.classList.remove('visible'); }, 600);
+                    wasDown = false;
                 }
             }
 
-            ping();
-            setInterval(ping, 3000);
-            // 視窗重新取得焦點時立刻檢查（分頁切回來不用等下一個 tick）
-            window.addEventListener('focus', ping);
+            async function checkHealth() {
+                if (inFlight) return;
+                inFlight = true;
+                try {
+                    var ctrl = new AbortController();
+                    var timer = setTimeout(function () { ctrl.abort(); }, 5000);
+                    var r = await fetch('/health', {
+                        cache: 'no-store',
+                        credentials: 'same-origin',
+                        signal: ctrl.signal,
+                    });
+                    clearTimeout(timer);
+                    if (!r.ok) throw new Error('bad_status_' + r.status);
+                    var d = await r.json();
+                    var id = d.instance_id;
+                    if (initialId === null) {
+                        initialId = id;
+                    } else if (id !== initialId) {
+                        textEl.textContent = '伺服器已更新，重新載入頁面…';
+                        banner.classList.add('visible');
+                        setTimeout(function () { window.location.reload(); }, 400);
+                        return;
+                    }
+                    showUp();
+                } catch (e) {
+                    showDown('連線中斷，正在重新連線…');
+                } finally {
+                    inFlight = false;
+                }
+            }
+
+            // 初次載入先記錄 instance_id
+            checkHealth();
+
+            // 瀏覽器原生連線事件：無輪詢，offline 立即顯示、online 立即驗證 server
+            window.addEventListener('offline', function () { showDown('連線中斷，正在重新連線…'); });
+            window.addEventListener('online', checkHealth);
+
+            // 使用者回到分頁時重新驗證（含 server 重啟偵測）
+            window.addEventListener('focus', checkHealth);
+            document.addEventListener('visibilitychange', function () {
+                if (document.visibilityState === 'visible') checkHealth();
+            });
+
+            // 長週期背景檢查：僅在分頁可見時執行，補足「使用者沒互動但 server 中途崩潰」的情境
+            setInterval(function () {
+                if (document.visibilityState === 'visible') checkHealth();
+            }, BACKGROUND_INTERVAL_MS);
         })();
     </script>
     {% block scripts %}{% endblock %}
