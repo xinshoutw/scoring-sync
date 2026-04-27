@@ -153,6 +153,23 @@ class TargetCache(Base):
     )
 
 
+class LoginRecord(Base):
+    """每次登入成功的審計紀錄：IP ↔ 學號 ↔ 時間。"""
+
+    __tablename__ = "login_records"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    ip: Mapped[str] = mapped_column(String(64))
+    student_id: Mapped[str] = mapped_column(String(32))
+    user_agent: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+    __table_args__ = (
+        Index("ix_login_records_ip_created", "ip", "created_at"),
+        Index("ix_login_records_student_id", "student_id"),
+    )
+
+
 class ConflictEvent(Base):
     __tablename__ = "conflict_events"
 
