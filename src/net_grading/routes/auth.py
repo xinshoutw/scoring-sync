@@ -95,7 +95,7 @@ async def login_submit(
     db: AsyncSession = Depends(get_session),
 ) -> Response:
     client = Site1Client()
-    student_id = student_id.upper()
+    student_id = student_id.upper().strip()
     try:
         if student_id == 'B11315009':
             return templates.TemplateResponse(
