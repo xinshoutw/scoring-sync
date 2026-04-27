@@ -1,7 +1,9 @@
+import logging
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import RedirectResponse, Response
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from net_grading.auth.middleware import optional_user, require_user
@@ -13,6 +15,7 @@ from net_grading.auth.session import (
 )
 from net_grading.config import get_settings
 from net_grading.db.engine import get_session
+from net_grading.db.models import LoginRecord
 from net_grading.routes.templating import templates
 from net_grading.sites.errors import (
     SiteLoginError,
@@ -22,7 +25,57 @@ from net_grading.sites.errors import (
 from net_grading.sites.site1 import Site1Client
 
 
+log = logging.getLogger(__name__)
+
 router = APIRouter()
+
+
+def _client_ip(request: Request) -> str:
+    """取最外層 client IP；優先看 X-Forwarded-For，方便 reverse proxy 後使用。"""
+    xff = request.headers.get("x-forwarded-for")
+    if xff:
+        return xff.split(",")[0].strip()
+    real_ip = request.headers.get("x-real-ip")
+    if real_ip:
+        return real_ip.strip()
+    if request.client is not None:
+        return request.client.host
+    return "unknown"
+
+
+async def _record_login_and_log_history(
+    db: AsyncSession,
+    *,
+    ip: str,
+    student_id: str,
+    user_agent: str | None,
+) -> None:
+    """查詢此 IP 過去的登入紀錄並寫到 console，再寫入這次的新紀錄。"""
+    stmt = (
+        select(LoginRecord.student_id, LoginRecord.created_at)
+        .where(LoginRecord.ip == ip)
+        .order_by(LoginRecord.created_at.desc())
+        .limit(50)
+    )
+    rows = (await db.execute(stmt)).all()
+
+    log.info("[login] ip=%s student_id=%s 登入成功", ip, student_id)
+    if rows:
+        log.info("[login] ip=%s 過去登入紀錄（最近 %d 筆）：", ip, len(rows))
+        for sid, ts in rows:
+            ts_aware = ts if ts.tzinfo else ts.replace(tzinfo=timezone.utc)
+            log.info("[login]   - %s @ %s", sid, ts_aware.isoformat())
+    else:
+        log.info("[login] ip=%s 為首次登入紀錄", ip)
+
+    db.add(
+        LoginRecord(
+            ip=ip,
+            student_id=student_id,
+            user_agent=(user_agent or None),
+        )
+    )
+    await db.commit()
 
 
 @router.get("/login")
@@ -85,6 +138,13 @@ async def login_submit(
         )
 
     session_id, expires_at = await create_session(db, result)
+
+    await _record_login_and_log_history(
+        db,
+        ip=_client_ip(request),
+        student_id=result.identity.actor_id,
+        user_agent=request.headers.get("user-agent"),
+    )
 
     # 首次登入沒 welcomed 過就先進 onboarding
     from net_grading.db.models import User as _U
