@@ -1,4 +1,6 @@
+import logging
 import secrets
+import sys
 from contextlib import asynccontextmanager
 from collections.abc import AsyncIterator
 from pathlib import Path
@@ -24,8 +26,30 @@ _STATIC_DIR = Path(__file__).parent / "static"
 SERVER_INSTANCE_ID = secrets.token_hex(8)
 
 
+_APP_LOGGER_HANDLER_FLAG = "_net_grading_app_handler"
+
+
+def _ensure_app_logger_visible(level: str) -> None:
+    """uvicorn 只配 uvicorn.* logger；幫 net_grading.* 接 stdout，才能看到 info 日誌。"""
+    app_logger = logging.getLogger("net_grading")
+    app_logger.setLevel(level.upper())
+    app_logger.propagate = False
+    if any(getattr(h, _APP_LOGGER_HANDLER_FLAG, False) for h in app_logger.handlers):
+        return
+    handler = logging.StreamHandler(sys.stdout)
+    handler.setFormatter(
+        logging.Formatter(
+            fmt="%(asctime)s %(levelname)s [%(name)s] %(message)s",
+            datefmt="%Y-%m-%d %H:%M:%S",
+        )
+    )
+    setattr(handler, _APP_LOGGER_HANDLER_FLAG, True)
+    app_logger.addHandler(handler)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    _ensure_app_logger_visible(get_settings().log_level)
     yield
     await dispose_engine()
 
